@@ -1,57 +1,65 @@
 # Eigen-Quest
 
-A small browser game that teaches the linear algebra behind the "Damage
-Synergy System" example from the OMS 6740 linear algebra review — matrix
-dynamics, eigenvalues/eigenvectors, and dominant-eigenvector convergence —
-by having students play it instead of read it.
+A small browser game built on the "Damage Synergy System" example from the
+OMS 6740 linear algebra review. Players level up one damage type per turn
+and try to maximize total damage output — the deeper linear-algebra story
+(why builds converge, eigenvalues/eigenvectors) is left for course
+discussion elsewhere; this app is deliberately just the game.
 
 **Play it:** open `index.html` in a browser, or visit the GitHub Pages URL
 once Pages is enabled for this repo (see below). No install, no login, no
-backend, no tracking.
+backend.
 
-## What it teaches
+## How it works
 
-Each level-up choice runs the exact dynamics from the slides:
+Each level-up choice runs:
 
 ```
 D_{t+1} = B · D_t + u_t
 ```
 
-where `D_t` is a 5-dimensional damage-type vector, `B = I + A` is a fixed
-synergy matrix, and `u_t` is the player's one-hot level-up choice. The game
-tracks how closely the (normalized) build aligns with the system's dominant
-eigenvector turn by turn — the payoff is watching that alignment climb
-toward 100% regardless of what the player picks, which is exactly the
-"every build converges to the same dominant direction" result from the
-slides.
+where `D_t` is the 5-dimensional damage-type vector, `B = I + A` is the
+fixed synergy matrix (see the in-app "How to play" section for every
+synergy percentage), and `u_t` is the player's one-hot level-up choice.
+There are 20 turns; the right-hand chart plots total damage output turn by
+turn against a dashed reference line marking the **theoretical maximum** —
+the best total damage achievable by any sequence of choices for this exact
+matrix and turn count (see "How the theoretical max is computed" below).
 
 ## Project structure
 
-- `index.html` — page structure / the four screens (title, level select, play, debrief)
+- `index.html` — page structure (title screen, welcome/name-entry screen, play screen)
 - `style.css` — all styling
-- `levels.js` — the "worlds": precomputed `B`, `λ_max`, and `v_max` for each level (computed offline in NumPy — see below)
-- `app.js` — game logic: matrix-vector multiply, cosine-similarity alignment tracking, screen wiring, comprehension-check questions
+- `levels.js` — the fixed synergy matrix, starting state, turn count, and precomputed theoretical max
+- `app.js` — game logic: matrix-vector multiply, the damage-over-time chart, the how-to-play synergy list, and score logging
 
-There is no build step and no dependencies. Everything is plain HTML/CSS/JS.
+No build step, no dependencies — plain HTML/CSS/JS.
 
-## How the level data was computed
+## How the theoretical max is computed
 
-`levels.js` embeds precomputed constants rather than solving an eigenproblem
-in the browser. For a level's synergy matrix `B`, that means:
+It's an exact closed form, not a search or simulation. Since
+`D_T = B^T D_0 + sum_{t=0}^{T-1} B^{T-1-t} u_t`, the total damage
+`1^T D_T` splits into a fixed baseline plus a sum of independent per-turn
+terms — so the optimal `u_t` at each turn just maximizes its own term,
+computed with repeated vector-matrix products `1^T B^k`. This was computed
+offline in NumPy and hardcoded as `theoreticalMax` in `levels.js`; the
+result (178.071089) was cross-checked by simulating the resulting optimal
+turn-by-turn choices end to end.
 
-```python
-import numpy as np
-eigvals, eigvecs = np.linalg.eig(B)
-order = np.argsort(-np.abs(eigvals))
-lambda_max = eigvals[order[0]].real
-v_max = eigvecs[:, order[0]].real
-v_max = v_max / v_max.sum()  # normalize to proportions
-```
+## Score logging — read this before telling students to "upload their score"
 
-`Trial 2: The Analyst's Build` uses the exact matrix and initial state from
-the slides' worked numeric example — its regression check (level up Fire
-from `D_0 = (10,8,6,7,9)` should give `D_1 = (11.75, 8.09, 6.40, 7.62, 9.70)`,
-total `43.56`) matches the slides exactly.
+This is a static site with **no server**. When a player clicks "Yes" on
+"Would you like to upload your score?", the score is saved to that
+browser's own `localStorage` and the player can download a CSV of
+everything logged in that browser. **There is no central collection across
+students or devices** — each student's scores stay on their own machine
+unless they manually send you their downloaded CSV.
+
+If you want scores collected automatically in one place (e.g. a shared
+spreadsheet), that needs an actual backend of some kind — even something
+lightweight like a Google Form/Sheet endpoint or a small serverless
+function. That's a real scope addition beyond a static site, so it wasn't
+built by default; ask if you want it added.
 
 ## Deploying with GitHub Pages
 
@@ -59,16 +67,4 @@ total `43.56`) matches the slides exactly.
 2. On GitHub: **Settings → Pages → Source → Deploy from a branch**, pick
    `main` and `/ (root)`, then **Save**.
 3. GitHub gives you a URL like `https://<username>.github.io/6740-rpg-game/`.
-   Share that link — e.g. in a pinned Ed Discussion post — rather than
-   expecting it to embed inline in Ed itself (see the build plan for why).
-
-## Status / next steps
-
-This is the Phase 0–1 MVP: two playable worlds, the core level-up loop, the
-convergence visualization, and a debrief with comprehension-check questions.
-Ideas for later, not required for launch:
-
-- A sandbox mode where students supply their own small matrix and the game
-  computes eigenvalues live (would need a library like math.js).
-- More worlds / a wider variety of convergence speeds.
-- Optional sound/animation polish.
+   Share that link — e.g. in a pinned Ed Discussion post.

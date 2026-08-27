@@ -1,15 +1,21 @@
 /**
  * app.js — Eigen-Quest game logic.
  *
- * Everything here runs client-side, no backend, no login, no tracking.
- * The only "linear algebra" happening live in the browser is a 5x5
- * matrix-vector multiply each turn (D_{t+1} = B*D_t + u_t) and a cosine
- * similarity against a precomputed target direction — see levels.js for
- * where the actual eigenvalues/eigenvectors came from.
+ * Everything here runs client-side: no backend, no login. The only math
+ * happening live in the browser is a 5x5 matrix-vector multiply each turn
+ * (D_{t+1} = B*D_t + u_t) — see levels.js for where the fixed matrix and
+ * the theoretical-max constant came from.
+ *
+ * Score logging: this is a static site with no server, so "uploading a
+ * score" means saving it to this browser's own localStorage and offering
+ * a CSV download — there is no central collection across students/devices
+ * yet. See README.md for how to add that if it's wanted later.
  */
 
 (function () {
   "use strict";
+
+  const SCORE_LOG_KEY = "eigenQuestScoreLog";
 
   // ---------- small linear algebra helpers ----------
 
@@ -17,9 +23,9 @@
     const n = v.length;
     const out = new Array(n).fill(0);
     for (let i = 0; i < n; i++) {
-      let sum = 0;
-      for (let j = 0; j < n; j++) sum += B[i][j] * v[j];
-      out[i] = sum;
+      let s = 0;
+      for (let j = 0; j < n; j++) s += B[i][j] * v[j];
+      out[i] = s;
     }
     return out;
   }
@@ -38,33 +44,15 @@
     return v.reduce((a, b) => a + b, 0);
   }
 
-  function norm(v) {
-    return Math.sqrt(v.reduce((a, b) => a + b * b, 0));
-  }
-
-  function cosSim(a, b) {
-    const na = norm(a),
-      nb = norm(b);
-    if (na === 0 || nb === 0) return 0;
-    let dot = 0;
-    for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
-    return dot / (na * nb);
-  }
-
-  function normalizeSum1(v) {
-    const s = sum(v);
-    if (s === 0) return v.map(() => 0);
-    return v.map((x) => x / s);
-  }
-
   // ---------- state ----------
 
   const state = {
-    levelIndex: null,
-    level: null,
+    playerName: "Player",
     turn: 0,
     D: [],
-    history: [], // { turn, D, cosSim, total }
+    history: [], // { turn, D, total }
+    choiceCounts: {},
+    ended: false,
   };
 
   // ---------- screen management ----------
@@ -76,56 +64,49 @@
     window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
   }
 
-  // ---------- title / level select ----------
+  // ---------- welcome screen ----------
 
-  function renderLevelSelect() {
-    const wrap = document.getElementById("level-list");
-    wrap.innerHTML = "";
-    LEVELS.forEach((level, idx) => {
-      const card = document.createElement("button");
-      card.className = "level-card";
-      card.innerHTML = `
-        <div class="level-card-name">${level.name}</div>
-        <div class="level-card-sub">${level.subtitle}</div>
-        <div class="level-card-meta">
-          <span>${level.labels.length} damage types</span>
-          <span>${level.maxTurns} turns</span>
-        </div>
-      `;
-      card.addEventListener("click", () => startLevel(idx));
-      wrap.appendChild(card);
-    });
-  }
+  function startGame() {
+    const nameInput = document.getElementById("player-name-input");
+    const typed = (nameInput.value || "").trim();
+    state.playerName = typed || "Player";
 
-  // ---------- play screen ----------
-
-  function startLevel(idx) {
-    state.levelIndex = idx;
-    state.level = LEVELS[idx];
     state.turn = 0;
-    state.D = state.level.D0.slice();
-    state.history = [
-      {
-        turn: 0,
-        D: state.D.slice(),
-        cosSim: cosSim(state.D, state.level.vMax),
-        total: sum(state.D),
-      },
-    ];
+    state.D = LEVEL.D0.slice();
+    state.history = [{ turn: 0, D: state.D.slice(), total: sum(state.D) }];
+    state.choiceCounts = {};
+    LEVEL.labels.forEach((l) => (state.choiceCounts[l] = 0));
+    state.ended = false;
 
-    document.getElementById("play-level-name").textContent = state.level.name;
+    document.getElementById("play-level-name").textContent = LEVEL.name;
+    document.getElementById("theoretical-max-value").textContent = LEVEL.theoreticalMax.toFixed(2);
+    document.getElementById("max-turns-value").textContent = LEVEL.maxTurns;
+
+    resetEndgamePanel();
     buildLevelUpButtons();
+    buildSynergyList();
     renderPlayScreen();
     showScreen("screen-play");
   }
 
+  function resetEndgamePanel() {
+    document.getElementById("endgame-panel").classList.add("hidden");
+    document.getElementById("endgame-prompt").classList.remove("hidden");
+    document.getElementById("endgame-result").classList.add("hidden");
+    document.getElementById("endgame-result").innerHTML = "";
+    document.getElementById("play-again-btn").classList.add("hidden");
+    document.querySelectorAll(".levelup-btn").forEach((b) => (b.disabled = false));
+  }
+
+  // ---------- play screen ----------
+
   function buildLevelUpButtons() {
     const wrap = document.getElementById("levelup-buttons");
     wrap.innerHTML = "";
-    state.level.labels.forEach((label, i) => {
+    LEVEL.labels.forEach((label, i) => {
       const btn = document.createElement("button");
       btn.className = "levelup-btn";
-      btn.style.setProperty("--type-color", state.level.colors[label]);
+      btn.style.setProperty("--type-color", LEVEL.colors[label]);
       btn.innerHTML = `<span class="dot"></span>${label}`;
       btn.addEventListener("click", () => levelUp(i));
       wrap.appendChild(btn);
@@ -133,201 +114,194 @@
   }
 
   function levelUp(typeIndex) {
-    const level = state.level;
-    if (state.turn >= level.maxTurns) return;
+    if (state.turn >= LEVEL.maxTurns) return;
 
-    const u = oneHot(level.labels.length, typeIndex);
-    state.D = vecAdd(matVec(level.B, state.D), u);
+    const label = LEVEL.labels[typeIndex];
+    const u = oneHot(LEVEL.labels.length, typeIndex);
+    state.D = vecAdd(matVec(LEVEL.B, state.D), u);
     state.turn += 1;
+    state.choiceCounts[label] += 1;
 
-    state.history.push({
-      turn: state.turn,
-      D: state.D.slice(),
-      cosSim: cosSim(state.D, level.vMax),
-      total: sum(state.D),
-    });
+    state.history.push({ turn: state.turn, D: state.D.slice(), total: sum(state.D) });
 
     renderPlayScreen();
 
-    if (state.turn >= level.maxTurns) {
-      document.getElementById("end-level-btn").classList.remove("hidden");
+    if (state.turn >= LEVEL.maxTurns) {
       document.querySelectorAll(".levelup-btn").forEach((b) => (b.disabled = true));
+      endGame();
     }
   }
 
   function renderPlayScreen() {
-    const level = state.level;
     const D = state.D;
     const maxVal = Math.max(...D, 1) * 1.15;
 
-    // damage bars
     const barsWrap = document.getElementById("damage-bars");
     barsWrap.innerHTML = "";
-    level.labels.forEach((label, i) => {
+    LEVEL.labels.forEach((label, i) => {
       const pct = Math.max(2, (D[i] / maxVal) * 100);
       const row = document.createElement("div");
       row.className = "bar-row";
       row.innerHTML = `
         <div class="bar-label">${label}</div>
         <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%;background:${level.colors[label]}"></div>
+          <div class="bar-fill" style="width:${pct}%;background:${LEVEL.colors[label]}"></div>
         </div>
         <div class="bar-value">${D[i].toFixed(2)}</div>
       `;
       barsWrap.appendChild(row);
     });
 
-    // total damage + turn counter
     document.getElementById("total-damage").textContent = sum(D).toFixed(2);
-    document.getElementById("turn-counter").textContent = `Turn ${state.turn} / ${level.maxTurns}`;
+    document.getElementById("turn-counter").textContent = `Turn ${state.turn} / ${LEVEL.maxTurns}`;
 
-    // alignment meter
-    const latest = state.history[state.history.length - 1];
-    const alignPct = Math.max(0, latest.cosSim) * 100;
-    document.getElementById("alignment-fill").style.width = alignPct.toFixed(1) + "%";
-    document.getElementById("alignment-value").textContent = alignPct.toFixed(1) + "%";
-
-    renderSparkline();
+    renderGrowthChart();
   }
 
-  function renderSparkline() {
-    const svg = document.getElementById("sparkline");
+  function renderGrowthChart() {
+    const svg = document.getElementById("growth-chart");
     const w = 260,
-      h = 60,
-      pad = 4;
-    const pts = state.history.map((h_, i) => {
-      const x = pad + (i / Math.max(1, state.level.maxTurns)) * (w - 2 * pad);
-      const y = h - pad - Math.max(0, h_.cosSim) * (h - 2 * pad);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-    const poly = svg.querySelector("polyline");
-    poly.setAttribute("points", pts.join(" "));
+      h = 140,
+      pad = 8;
+    const yMax = LEVEL.theoreticalMax * 1.08;
+
+    const xAt = (turn) => pad + (turn / LEVEL.maxTurns) * (w - 2 * pad);
+    const yAt = (value) => h - pad - (Math.min(value, yMax) / yMax) * (h - 2 * pad);
+
+    // your growing output curve
+    const pts = state.history.map((entry) => `${xAt(entry.turn).toFixed(1)},${yAt(entry.total).toFixed(1)}`);
+    svg.querySelector("#growth-poly").setAttribute("points", pts.join(" "));
+
+    // fixed vertical reference bar at the right edge: theoretical max for this world
+    const xRef = xAt(LEVEL.maxTurns);
+    const line = svg.querySelector("#max-ref-line");
+    line.setAttribute("x1", xRef.toFixed(1));
+    line.setAttribute("x2", xRef.toFixed(1));
+    line.setAttribute("y1", yAt(0).toFixed(1));
+    line.setAttribute("y2", yAt(LEVEL.theoreticalMax).toFixed(1));
   }
 
-  // ---------- debrief screen ----------
+  // ---------- how to play / synergy list ----------
 
-  function showDebrief() {
-    const level = state.level;
-    const finalD = state.D;
-    const finalProportions = normalizeSum1(finalD);
-    const finalCos = cosSim(finalD, level.vMax);
-    const growthPct = (level.lambdaMax - 1) * 100;
-
-    document.getElementById("debrief-level-name").textContent = level.name;
-    document.getElementById("debrief-text").textContent = level.debrief;
-    document.getElementById("debrief-growth").textContent = `+${growthPct.toFixed(2)}% / turn`;
-    document.getElementById("debrief-alignment").textContent = `${(finalCos * 100).toFixed(1)}%`;
-    document.getElementById("debrief-ratio").textContent = level.lambda2Ratio.toFixed(3);
-
-    const compareWrap = document.getElementById("debrief-compare");
-    compareWrap.innerHTML = "";
-    level.labels.forEach((label, i) => {
-      const yourPct = finalProportions[i] * 100;
-      const targetPct = level.vMax[i] * 100;
-      const row = document.createElement("div");
-      row.className = "compare-row";
-      row.innerHTML = `
-        <div class="compare-label">${label}</div>
-        <div class="compare-track">
-          <div class="compare-target" style="width:${targetPct}%"></div>
-          <div class="compare-yours" style="width:${yourPct}%;background:${level.colors[label]}"></div>
-        </div>
-        <div class="compare-values">
-          <span>you: ${yourPct.toFixed(1)}%</span>
-          <span>settles at: ${targetPct.toFixed(1)}%</span>
-        </div>
-      `;
-      compareWrap.appendChild(row);
-    });
-
-    buildCheckQuestions();
-    showScreen("screen-debrief");
-  }
-
-  // ---------- comprehension check ----------
-
-  const QUESTIONS = [
-    {
-      q: "Suppose two players play the same world, one always leveling up the same damage type and the other rotating through all of them evenly. After many turns, their total damage will be...",
-      options: [
-        "About the same — both converge to the same dominant direction",
-        "Very different — the focused build always wins big",
-        "Very different — the balanced build always wins big",
-      ],
-      correct: 0,
-      explain:
-        "Both trajectories are eventually dominated by the same eigenvector, so their long-run growth rate and shape converge regardless of strategy — that's the whole theorem this game is built around.",
-    },
-    {
-      q: "What mainly controls how many turns it takes for a build to visibly “lock in” to its final shape?",
-      options: [
-        "Which damage type you pick first",
-        "The gap between the top two eigenvalues of B",
-        "The total number of damage types in the game",
-      ],
-      correct: 1,
-      explain:
-        "A bigger gap between λ₁ and λ₂ means the second-strongest mode decays away faster — that's why Trial of Convergence (ratio ≈ 0.94) settled in noticeably faster than The Analyst's Build (ratio ≈ 0.96).",
-    },
-  ];
-
-  function buildCheckQuestions() {
-    const wrap = document.getElementById("check-questions");
+  function buildSynergyList() {
+    const wrap = document.getElementById("synergy-list");
     wrap.innerHTML = "";
-    QUESTIONS.forEach((item, qi) => {
-      const block = document.createElement("div");
-      block.className = "check-block";
-      const optionsHtml = item.options
-        .map(
-          (opt, oi) =>
-            `<button class="check-option" data-q="${qi}" data-o="${oi}">${opt}</button>`
-        )
-        .join("");
-      block.innerHTML = `
-        <div class="check-question">${item.q}</div>
-        <div class="check-options">${optionsHtml}</div>
-        <div class="check-feedback" id="check-feedback-${qi}"></div>
-      `;
-      wrap.appendChild(block);
-    });
-
-    wrap.querySelectorAll(".check-option").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const qi = Number(btn.dataset.q);
-        const oi = Number(btn.dataset.o);
-        const item = QUESTIONS[qi];
-        const feedback = document.getElementById(`check-feedback-${qi}`);
-        const optionButtons = wrap.querySelectorAll(`.check-option[data-q="${qi}"]`);
-        optionButtons.forEach((b) => (b.disabled = true));
-        btn.classList.add(oi === item.correct ? "correct" : "incorrect");
-        if (oi !== item.correct) {
-          optionButtons[item.correct].classList.add("correct");
+    const n = LEVEL.labels.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const a = LEVEL.B[i][j];
+        if (a > 0) {
+          const item = document.createElement("div");
+          item.className = "synergy-item";
+          item.innerHTML = `<span class="dot" style="background:${LEVEL.colors[LEVEL.labels[j]]}"></span>${LEVEL.labels[j]} → ${LEVEL.labels[i]}: ${(a * 100).toFixed(0)}%`;
+          wrap.appendChild(item);
         }
-        feedback.textContent = (oi === item.correct ? "Correct — " : "Not quite — ") + item.explain;
-        feedback.classList.add("visible");
-      });
-    });
+      }
+    }
+  }
+
+  // ---------- end of game / score upload ----------
+
+  function endGame() {
+    state.ended = true;
+    const finalScore = sum(state.D);
+    document.getElementById("endgame-score").textContent = finalScore.toFixed(2);
+    document.getElementById("endgame-panel").classList.remove("hidden");
+  }
+
+  function saveScoreRecord() {
+    const record = {
+      name: state.playerName,
+      score: Number(sum(state.D).toFixed(2)),
+      turns: LEVEL.maxTurns,
+      selections: { ...state.choiceCounts },
+      timestamp: new Date().toISOString(),
+    };
+    let log = [];
+    try {
+      log = JSON.parse(localStorage.getItem(SCORE_LOG_KEY) || "[]");
+    } catch (e) {
+      log = [];
+    }
+    log.push(record);
+    try {
+      localStorage.setItem(SCORE_LOG_KEY, JSON.stringify(log));
+    } catch (e) {
+      // localStorage unavailable (private browsing, quota, etc.) — degrade quietly
+    }
+    return { record, count: log.length };
+  }
+
+  function downloadScoreLogCsv() {
+    let log = [];
+    try {
+      log = JSON.parse(localStorage.getItem(SCORE_LOG_KEY) || "[]");
+    } catch (e) {
+      log = [];
+    }
+    if (log.length === 0) return;
+
+    const labelCols = LEVEL.labels;
+    const header = ["name", "score", "turns", ...labelCols, "timestamp"];
+    const rows = log.map((r) =>
+      [
+        JSON.stringify(r.name || ""),
+        r.score,
+        r.turns,
+        ...labelCols.map((l) => (r.selections && r.selections[l]) || 0),
+        r.timestamp,
+      ].join(",")
+    );
+    const csv = [header.join(","), ...rows].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "eigen-quest-scores.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleScoreChoice(uploaded) {
+    document.getElementById("endgame-prompt").classList.add("hidden");
+    const resultEl = document.getElementById("endgame-result");
+    resultEl.classList.remove("hidden");
+
+    if (uploaded) {
+      const { count } = saveScoreRecord();
+      resultEl.innerHTML = `
+        <p>Saved to this browser's local score log (${count} entr${count === 1 ? "y" : "ies"} so far).</p>
+        <button id="download-log-btn" class="btn btn-secondary">Download score log (CSV)</button>
+      `;
+      document.getElementById("download-log-btn").addEventListener("click", downloadScoreLogCsv);
+    } else {
+      resultEl.innerHTML = `<p>No problem — your score wasn't saved.</p>`;
+    }
+
+    document.getElementById("play-again-btn").classList.remove("hidden");
   }
 
   // ---------- wiring ----------
 
   document.addEventListener("DOMContentLoaded", () => {
-    renderLevelSelect();
-
     document.getElementById("begin-btn").addEventListener("click", () => {
-      showScreen("screen-select");
+      showScreen("screen-welcome");
     });
 
-    document.getElementById("end-level-btn").addEventListener("click", showDebrief);
+    document.getElementById("start-game-btn").addEventListener("click", startGame);
 
-    document.getElementById("play-again-btn").addEventListener("click", () => {
-      startLevel(state.levelIndex);
+    document.getElementById("player-name-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startGame();
     });
 
-    document.getElementById("choose-world-btn").addEventListener("click", () => {
-      showScreen("screen-select");
-    });
+    document.getElementById("score-yes-btn").addEventListener("click", () => handleScoreChoice(true));
+    document.getElementById("score-no-btn").addEventListener("click", () => handleScoreChoice(false));
+
+    document.getElementById("play-again-btn").addEventListener("click", startGame);
 
     document.getElementById("title-link").addEventListener("click", (e) => {
       e.preventDefault();

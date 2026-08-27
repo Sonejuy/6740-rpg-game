@@ -137,7 +137,7 @@ main {
   text-align: left;
 }
 
-/* ---------- buttons ---------- */
+/* ---------- buttons & fields ---------- */
 
 .btn {
   font-family: "Manrope", sans-serif;
@@ -177,55 +177,32 @@ main {
   display: none !important;
 }
 
-/* ---------- level select ---------- */
-
-.level-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-top: 1.2rem;
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin: 1.2rem 0 0.4rem;
 }
 
-@media (max-width: 620px) {
-  .level-list {
-    grid-template-columns: 1fr;
-  }
-}
-
-.level-card {
-  text-align: left;
+.text-input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
   color: var(--ink);
-  cursor: pointer;
   font-family: inherit;
+  font-size: 1rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 1.4rem;
 }
 
-.level-card:hover {
+.text-input:focus {
+  outline: none;
   border-color: var(--gold);
-}
-
-.level-card-name {
-  font-family: "Cinzel", serif;
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 0.3rem;
-}
-
-.level-card-sub {
-  color: var(--ink-soft);
-  font-size: 0.88rem;
-  margin-bottom: 0.7rem;
-}
-
-.level-card-meta {
-  display: flex;
-  gap: 0.9rem;
-  font-family: "Space Mono", monospace;
-  font-size: 0.75rem;
-  color: var(--teal);
 }
 
 /* ---------- play screen ---------- */
@@ -316,49 +293,53 @@ main {
   color: var(--gold);
 }
 
-.alignment-meter {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+/* damage-over-time chart */
 
-.alignment-track {
-  flex: 1;
-  height: 14px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.alignment-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--teal), var(--gold));
-  transition: width 0.35s ease;
-}
-
-.alignment-value {
-  font-family: "Space Mono", monospace;
-  font-size: 0.95rem;
-  min-width: 4.5em;
-  text-align: right;
-}
-
-.sparkline {
+.growth-chart {
   width: 100%;
-  height: 60px;
-  margin-top: 0.9rem;
+  height: 140px;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
 }
 
-.sparkline polyline {
+.growth-chart #growth-poly {
   fill: none;
   stroke: var(--teal);
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.growth-chart #max-ref-line {
+  stroke: var(--gold);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1.4rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-top: 0.6rem;
+  font-family: "Space Mono", monospace;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+}
+
+.dot-curve {
+  background: var(--teal);
+}
+
+.dot-max {
+  background: var(--gold);
 }
 
 .hint {
@@ -411,167 +392,67 @@ main {
   cursor: not-allowed;
 }
 
-/* ---------- debrief screen ---------- */
+/* ---------- end of game ---------- */
 
-.stat-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.8rem;
-  margin: 1.4rem 0;
+.endgame-panel {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.3rem 1.4rem;
+  margin-bottom: 2rem;
 }
 
-@media (max-width: 620px) {
-  .stat-row {
+.endgame-question {
+  font-size: 1.05rem;
+}
+
+.endgame-question strong {
+  color: var(--gold);
+  font-family: "Space Mono", monospace;
+}
+
+.endgame-actions {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+.endgame-block + .btn {
+  margin-top: 0.9rem;
+}
+
+/* ---------- how to play ---------- */
+
+.howto {
+  border-top: 1px solid var(--border);
+  padding-top: 0.4rem;
+}
+
+.synergy-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem 1.5rem;
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .synergy-list {
     grid-template-columns: 1fr;
   }
 }
 
-.stat-tile {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.9rem 1rem;
+.synergy-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.stat-label {
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.stat-value {
-  font-family: "Space Mono", monospace;
-  font-size: 1.3rem;
-  color: var(--gold);
-}
-
-.debrief-compare {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.compare-row {
-  display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: 0.8rem;
   align-items: center;
 }
 
-.compare-label {
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-}
-
-.compare-track {
-  position: relative;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  height: 20px;
-  overflow: hidden;
-}
-
-.compare-target {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-right: 2px dashed rgba(232, 236, 241, 0.55);
-  box-sizing: border-box;
-}
-
-.compare-yours {
-  position: absolute;
-  top: 3px;
-  left: 0;
-  height: 14px;
-  border-radius: 4px;
-  opacity: 0.9;
-}
-
-.compare-values {
-  grid-column: 2 / 3;
-  display: flex;
-  justify-content: space-between;
-  font-family: "Space Mono", monospace;
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-  margin-top: -0.4rem;
-}
-
-.check-questions {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-
-.check-block {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
-}
-
-.check-question {
-  font-weight: 600;
-  margin-bottom: 0.8rem;
-}
-
-.check-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.check-option {
-  text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 0.6rem 0.9rem;
-  font-family: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.check-option:hover:not(:disabled) {
-  border-color: var(--ink-soft);
-}
-
-.check-option:disabled {
-  cursor: default;
-}
-
-.check-option.correct {
-  border-color: var(--good);
-  background: rgba(76, 175, 106, 0.12);
-}
-
-.check-option.incorrect {
-  border-color: var(--danger);
-  background: rgba(226, 87, 43, 0.12);
-}
-
-.check-feedback {
-  margin-top: 0.7rem;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-  display: none;
-}
-
-.check-feedback.visible {
-  display: block;
-}
-
-.debrief-actions {
-  display: flex;
-  gap: 0.8rem;
-  margin-top: 2rem;
-  flex-wrap: wrap;
+.synergy-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
 }
