@@ -127,19 +127,46 @@ list — see the in-app "How to play" section).
 
 ## Score logging — read this before telling students to "submit their score"
 
-This is a static site with **no server**. Clicking "Submit Score" saves the
-current score to that browser's own `localStorage`, and the player can
-download a CSV of everything logged in that browser (name, score, points
-allocated, the per-attribute allocation, and a timestamp). **There is no
-central collection across students or devices** — each student's scores
-stay on their own machine unless they manually send you their downloaded
-CSV.
+This is a static site with **no server**. Clicking "Submit Score" always
+saves the current score to that browser's own `localStorage` (and the
+player can download a CSV of everything logged in that browser — name,
+score, points allocated, the per-attribute allocation, and a timestamp).
+That local copy is the fallback of last resort and always happens,
+regardless of the setting below.
 
-If you want scores collected automatically in one place (e.g. a shared
-spreadsheet), that needs an actual backend of some kind — even something
-lightweight like a Google Form/Sheet endpoint or a small serverless
-function. That's a real scope addition beyond a static site, so it wasn't
-built by default; ask if you want it added.
+### Central collection (optional, off by default)
+
+`app.js` can also push every submitted score straight into a Google Sheet
+you own, via a small Google Apps Script "Web App" acting as a free,
+serverless backend — no server to run, no third-party service, no cost.
+It's off by default (`SHEET_WEBHOOK_URL = ""` at the top of `app.js`).
+To turn it on:
+
+1. Create a new Google Sheet (any name, e.g. "Eigen-Quest scores").
+2. In it, go to **Extensions → Apps Script**. Delete the placeholder code
+   and paste in the contents of `apps-script.gs` from this repo.
+3. Click **Deploy → New deployment**. For "Select type," pick **Web app**.
+   Set "Execute as" to **Me**, and "Who has access" to **Anyone**.
+4. Click **Deploy**. Google will ask you to authorize the script (it's
+   your own script acting on your own Sheet) — approve it.
+5. Copy the **Web app URL** it gives you (ends in `/exec`).
+6. Send that URL back and it'll be dropped into `SHEET_WEBHOOK_URL` in
+   `app.js`, committed, and pushed — GitHub Pages picks it up within a
+   minute or two.
+
+Once set, a "Responses" tab appears in that Sheet with one row per
+submission (timestamp, player name, score, points allocated, and the
+per-attribute allocation), live as students play. Because the request
+uses `mode: "no-cors"`, the game never sees whether the row actually
+landed — the local `localStorage`/CSV save is unaffected either way, so a
+student's own record is never lost even if the Sheet write fails.
+
+The Web app URL is a write-only endpoint (it can only append rows in the
+shape the script expects) tied to your own Google account. It's visible to
+anyone who inspects the page source or the repo, same as everything else
+in this backend-less static site — that's fine here since the endpoint
+can't be used to read data back, only append a row shaped like a game
+submission.
 
 ## Deploying with GitHub Pages
 

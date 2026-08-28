@@ -5,12 +5,18 @@
  * points across 5 attributes, can add/remove anytime, and can submit
  * their current score whenever they like. Everything is client-side —
  * "submitting a score" saves it to this browser's own localStorage plus
- * a CSV download (see README.md for why, and what central collection
- * across students would need).
+ * a CSV download, AND (if SHEET_WEBHOOK_URL below is set) fires the same
+ * record off to an instructor-owned Google Sheet for central collection.
+ * See README.md, "Score logging", for how to set that up.
  */
 
 (function () {
   "use strict";
+
+  // Paste your deployed Google Apps Script Web App URL here to enable
+  // central score collection into a Google Sheet. Leave as "" to keep
+  // scores local-only (each student's own browser + their CSV download).
+  const SHEET_WEBHOOK_URL = "";
 
   const SCORE_LOG_KEY = "eigenQuestScoreLog";
 
@@ -290,12 +296,36 @@
       // localStorage unavailable — degrade quietly
     }
 
+    sendToSheet(record);
+
     const feedback = document.getElementById("submit-feedback");
     feedback.innerHTML = `
-      <p>Submitted — score ${record.score.toFixed(2)} saved to this browser's local log (${log.length} entr${log.length === 1 ? "y" : "ies"} so far).</p>
+      <p>Submitted — score ${record.score.toFixed(2)} saved to this browser's local log (${log.length} entr${log.length === 1 ? "y" : "ies"} so far)${SHEET_WEBHOOK_URL ? " and sent to the class spreadsheet" : ""}.</p>
       <button id="download-log-btn" class="btn btn-secondary">Download score log (CSV)</button>
     `;
     document.getElementById("download-log-btn").addEventListener("click", downloadScoreLogCsv);
+  }
+
+  // Fire-and-forget POST to an instructor-owned Google Apps Script Web App
+  // (see README.md "Score logging"). Uses mode: "no-cors" + a text/plain
+  // body so the browser skips the CORS preflight that Apps Script doesn't
+  // handle — meaning we can't read a response, so this never blocks or
+  // fails the local save/CSV path above, which stays the source of truth
+  // for the student either way.
+  function sendToSheet(record) {
+    if (!SHEET_WEBHOOK_URL) return;
+    try {
+      fetch(SHEET_WEBHOOK_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(record),
+      }).catch(() => {
+        /* offline or blocked — local log/CSV still has the record */
+      });
+    } catch (e) {
+      /* fetch unavailable — local log/CSV still has the record */
+    }
   }
 
   function downloadScoreLogCsv() {
