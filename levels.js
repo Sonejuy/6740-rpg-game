@@ -20,17 +20,20 @@
  *   - The displayed "Effective Attribute Profile" is x_t = B^t * x0 —
  *     i.e. the raw allocation run through t rounds of the fixed synergy
  *     interaction. Total damage output = 1^T x_t (just the bars summed).
- *   - "Theoretical max" is the slides' own asymptotic approximation
- *     (section 2.4-2.5): D_t ~ c1 * lambda1^t * v1, where
- *     c1 = (v1 . x0) / (v1 . v1) = (v1 . x0) since v1 is unit-norm.
- *     It's evaluated at t = TOTAL_POINTS (the full 50-point game) using
- *     whichever x0 the player's CURRENT allocation produces — so it's a
- *     moving target that reflects the build direction you're currently
- *     exploring, not a fixed number. Because it drops the non-dominant
- *     eigen-modes, it's an approximation, not a strict ceiling: with
- *     equal eigengaps the other modes haven't fully decayed away even by
- *     t=50, so the true value can occasionally land a little above or
- *     below this line. That's expected, not a bug.
+ *   - "D_max" (shown as the dashed benchmark line) is the slides' own
+ *     asymptotic approximation (section 2.4-2.5): D_t ~ c1 * lambda1^t * v1,
+ *     where c1 = (v1 . x0) / (v1 . v1) = (v1 . x0) since v1 is unit-norm.
+ *     It's evaluated with x0 = BASE (the FIXED starting vector (1,1,1,1,1),
+ *     not the player's current allocation) and t = TOTAL_POINTS — so it's a
+ *     single constant, computed once: the projected long-run damage if the
+ *     untouched starting profile were simply run through the dynamics for
+ *     the full 50 rounds with no points spent at all. It does not depend on
+ *     how the player builds; it's a fixed benchmark to build past. Because
+ *     it drops the non-dominant eigen-modes, it's an approximation of
+ *     that baseline, not exact: with equal eigengaps the other modes
+ *     haven't fully decayed away even by t=50, so the exact value is
+ *     slightly different (see README.md for the exact-vs-approximate
+ *     comparison). That's expected, not a bug.
  */
 
 const LABELS = ["Fire", "Water", "Earth", "Wind", "Physical"];

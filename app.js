@@ -50,7 +50,9 @@
     playerName: "Player",
     allocation: [0, 0, 0, 0, 0],
     history: [], // [{ t, damage }] chronological trace, can move forward or backward
-    chartCeiling: 1, // fixed y-axis scale for the session, set in startGame()
+    maxReached: 0, // highest damage value reached this session — ratchets up
+                   // only (never shrinks), so the chart's y-axis never
+                   // rescales down and hides a regress when points are removed
   };
 
   function currentX0() {
@@ -61,25 +63,18 @@
     return sum(state.allocation);
   }
 
-  function theoreticalMax(x0) {
-    const c1 = dot(V1, x0);
+  // D_max = 1^T c1 * lambda1^Tmax * v1, where c1 = (v1 . x0) / (v1 . v1).
+  // Per spec, x0 here is the FIXED starting vector BASE = (1,1,1,1,1) and
+  // Tmax = TOTAL_POINTS — NOT the player's current allocation. Since B,
+  // BASE, and TOTAL_POINTS are all fixed, D_max is a single constant: the
+  // projected long-run total damage if the untouched starting profile were
+  // simply run through the synergy dynamics for all 50 rounds with no
+  // points spent at all. It's a fixed benchmark to build past, computed
+  // once — not a per-build number that moves as the player reallocates.
+  const DMAX = (function () {
+    const c1 = dot(V1, BASE) / dot(V1, V1); // V1 is unit-norm, so this is just dot(V1, BASE)
     return c1 * Math.pow(LAMBDA1, TOTAL_POINTS) * sum(V1);
-  }
-
-  // theoreticalMax(x0) is linear in x0, maximized over the feasible
-  // allocation simplex at a vertex — i.e. by putting all TOTAL_POINTS into
-  // whichever single attribute has the largest V1 component. Used only to
-  // fix the chart's y-axis so the curve visibly rises AND falls as points
-  // are added/removed, instead of the axis silently rescaling every click.
-  function maxPossibleTheoreticalMax() {
-    let best = 0;
-    for (let i = 0; i < LABELS.length; i++) {
-      const x0 = BASE.slice();
-      x0[i] += TOTAL_POINTS;
-      best = Math.max(best, theoreticalMax(x0));
-    }
-    return best;
-  }
+  })();
 
   // ---------- screen management ----------
 
@@ -98,8 +93,9 @@
     state.playerName = typed || "Player";
 
     state.allocation = [0, 0, 0, 0, 0];
-    state.history = [{ t: 0, damage: sum(BASE) }];
-    state.chartCeiling = maxPossibleTheoreticalMax();
+    const initialDamage = sum(BASE);
+    state.history = [{ t: 0, damage: initialDamage }];
+    state.maxReached = Math.max(DMAX, initialDamage);
 
     document.getElementById("submit-feedback").innerHTML = "";
 
@@ -145,10 +141,12 @@
     const x0 = currentX0();
     const t = currentT();
     const effective = applyPower(x0, t);
-    state.history.push({ t, damage: sum(effective) });
+    const damage = sum(effective);
+    state.history.push({ t, damage });
     if (state.history.length > HISTORY_CAP) {
       state.history = state.history.slice(state.history.length - HISTORY_CAP);
     }
+    state.maxReached = Math.max(state.maxReached, damage); // ratchet up only, never down
 
     renderPlayScreen();
   }
@@ -192,22 +190,21 @@
       btn.disabled = state.allocation[Number(btn.dataset.i)] <= 0;
     });
 
-    renderGrowthChart(x0);
+    renderGrowthChart();
   }
 
-  function renderGrowthChart(x0) {
+  function renderGrowthChart() {
     const svg = document.getElementById("growth-chart");
     const w = 260,
       h = 140,
       pad = 8;
 
-    const refValue = theoreticalMax(x0);
-    // Fixed for the whole session (see maxPossibleTheoreticalMax) so the
-    // curve visibly rises AND falls as points are added/removed, instead of
-    // the axis silently rescaling — and clamped so a stray value beyond the
-    // ceiling (the asymptotic formula is an approximation, see levels.js)
-    // still fits rather than getting cut off.
-    const yMax = Math.max(state.chartCeiling, refValue, ...state.history.map((e) => e.damage)) * 1.02;
+    // state.maxReached only ever grows (see adjustAllocation/startGame), so
+    // the axis never rescales down and hides a regress — and it starts
+    // small (near DMAX) rather than at the global worst-case ceiling, so a
+    // typical build's rises and falls stay visually legible instead of
+    // being squeezed into a sliver at the bottom of the chart.
+    const yMax = state.maxReached * 1.06;
 
     const xAt = (t) => pad + (t / TOTAL_POINTS) * (w - 2 * pad);
     const yAt = (value) => h - pad - (Math.max(0, Math.min(value, yMax)) / yMax) * (h - 2 * pad);
@@ -215,14 +212,16 @@
     const pts = state.history.map((e) => `${xAt(e.t).toFixed(1)},${yAt(e.damage).toFixed(1)}`);
     svg.querySelector("#growth-poly").setAttribute("points", pts.join(" "));
 
-    const xRef = xAt(TOTAL_POINTS);
+    // DMAX is a fixed constant (see above) — not tied to any particular t —
+    // so it's drawn as a horizontal line spanning the full chart width.
+    const yRef = yAt(DMAX).toFixed(1);
     const line = svg.querySelector("#max-ref-line");
-    line.setAttribute("x1", xRef.toFixed(1));
-    line.setAttribute("x2", xRef.toFixed(1));
-    line.setAttribute("y1", yAt(0).toFixed(1));
-    line.setAttribute("y2", yAt(refValue).toFixed(1));
+    line.setAttribute("x1", pad.toFixed(1));
+    line.setAttribute("x2", (w - pad).toFixed(1));
+    line.setAttribute("y1", yRef);
+    line.setAttribute("y2", yRef);
 
-    document.getElementById("theoretical-max-value").textContent = refValue.toFixed(2);
+    document.getElementById("theoretical-max-value").textContent = DMAX.toFixed(2);
   }
 
   // ---------- how to play / synergy list ----------

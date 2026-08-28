@@ -28,19 +28,57 @@ play" section for every synergy percentage). Total damage output is
 `1^T x_t` — the effective attributes summed.
 
 The right-hand "Damage output" chart traces total damage as the player
-adds/removes points, against a dashed **theoretical max** reference line.
-That reference is the slides' own asymptotic approximation
-(`D_t ≈ c1 · λ1^t · v1` for large `t`), evaluated at `t = TOTAL_POINTS`
-using the player's *current* raw vector — so it's a moving target that
-reflects whichever build direction is currently on screen, not a fixed
-number. Because it drops the non-dominant eigen-modes it's an
-approximation, not a strict ceiling: with equal eigengaps the other modes
-haven't fully decayed away even by `t = 50`, so a build can occasionally
-land a little above or below the line. That's expected, not a bug. The
-chart's y-axis is fixed for the whole session (to whichever single
-attribute, if all 50 points went into it, would maximize this formula), so
-the curve visibly rises when points are added and visibly falls when
-they're removed instead of the axis silently rescaling.
+adds/removes points, against a dashed horizontal **D_max** benchmark line:
+
+```
+D_max = 1^T c1 λ1^Tmax v1,   c1 = (v1 · x0) / (v1 · v1)
+```
+
+using the slides' own asymptotic approximation (section 2.4–2.5), with
+`x0 = BASE = (1,1,1,1,1)` (the fixed starting vector, *not* the player's
+allocation) and `Tmax = TOTAL_POINTS = 50`. Since `B`, `BASE`, and
+`TOTAL_POINTS` are all fixed, `D_max` is a single constant — the projected
+long-run total damage if the untouched starting profile were simply run
+through the synergy dynamics for all 50 rounds with no points spent at
+all. It does **not** depend on the player's build; it's a fixed baseline
+to build past, not a per-build target. With the current matrix:
+
+```
+D_max (asymptotic formula) ≈ 90.68
+exact B^50 · BASE, summed  ≈ 90.89   (see "Eigenvalues and eigenvectors" below)
+```
+
+The small gap between the two is expected: the formula keeps only the
+dominant eigen-mode, and with equal eigengaps (`0.03` apart) the other
+modes haven't fully decayed away even by round 50.
+
+The chart's y-axis ratchets up to the highest total damage the player has
+reached so far this session (seeded at `D_max` so the benchmark line is
+visible from the start) and **never shrinks** — so removing points always
+shows a visible drop in the curve against a stable frame, instead of the
+axis rescaling down and hiding the regress.
+
+## Eigenvalues and eigenvectors
+
+Computed with NumPy (`np.linalg.eigh`, since `B` is symmetric):
+
+| | λ | eigengap to next |
+|---|---|---|
+| λ1 (dominant) | 1.060000 | 0.030 |
+| λ2 | 1.030000 | 0.030 |
+| λ3 | 1.000000 | 0.030 |
+| λ4 | 0.970000 | 0.030 |
+| λ5 | 0.940000 | — |
+
+Dominant eigenvector (unit norm, matches `V1` in `levels.js`):
+
+```
+v1 = (0.532888, 0.406914, 0.368169, 0.445675, 0.465056)
+```
+
+(Fire has the largest component, so it's the single best attribute to
+dump points into if maximizing eventual total damage is the only goal —
+see the in-app synergy list for why.)
 
 The game never ends — there's no turn limit and no end screen. Players can
 click **Submit Score** at any point to log their current total damage.
