@@ -49,10 +49,10 @@
   const state = {
     playerName: "Player",
     allocation: [0, 0, 0, 0, 0],
-    history: [], // [{ t, damage }] chronological trace, can move forward or backward
-    maxReached: 0, // highest damage value reached this session — ratchets up
-                   // only (never shrinks), so the chart's y-axis never
-                   // rescales down and hides a regress when points are removed
+    history: [], // [{ t, damage }] chronological trace of ACTUAL achieved
+                 // damage, can move forward or backward as points are
+                 // added/removed
+    chartCeiling: 1, // fixed y-axis scale for the whole session, set once in startGame()
   };
 
   function currentX0() {
@@ -63,18 +63,42 @@
     return sum(state.allocation);
   }
 
-  // D_max = 1^T c1 * lambda1^Tmax * v1, where c1 = (v1 . x0) / (v1 . v1).
-  // Per spec, x0 here is the FIXED starting vector BASE = (1,1,1,1,1) and
-  // Tmax = TOTAL_POINTS — NOT the player's current allocation. Since B,
-  // BASE, and TOTAL_POINTS are all fixed, D_max is a single constant: the
-  // projected long-run total damage if the untouched starting profile were
-  // simply run through the synergy dynamics for all 50 rounds with no
-  // points spent at all. It's a fixed benchmark to build past, computed
-  // once — not a per-build number that moves as the player reallocates.
-  const DMAX = (function () {
-    const c1 = dot(V1, BASE) / dot(V1, V1); // V1 is unit-norm, so this is just dot(V1, BASE)
-    return c1 * Math.pow(LAMBDA1, TOTAL_POINTS) * sum(V1);
-  })();
+  // Theoretical (idealized) growth curve, dominant-mode only:
+  //   D_t = c_t * lambda1^t * v1,   c_t = (1^T x0 + t) / (1^T v1)
+  // x0 here is the FIXED starting vector BASE = (1,1,1,1,1) — NOT the
+  // player's current allocation — and t ranges over [0, TOTAL_POINTS]. This
+  // represents "if every point spent so far had been funneled optimally
+  // along the dominant growth direction," independent of which attribute
+  // the player actually chose — a benchmark curve to compare the real
+  // build against, not a tracking of the real build itself. (1^T v1) cancels
+  // algebraically, so the scalar total simplifies to (1^T x0 + t) * lambda1^t,
+  // but it's computed via the literal formula below for traceability.
+  function theoreticalD(t) {
+    const c_t = (sum(BASE) + t) / sum(V1);
+    return c_t * Math.pow(LAMBDA1, t) * sum(V1);
+  }
+
+  // D_max = theoreticalD(TOTAL_POINTS) — the curve's value at full spend.
+  // Since BASE, B, and TOTAL_POINTS are all fixed, this is a single
+  // constant, not a per-build number that moves as the player reallocates.
+  const DMAX = theoreticalD(TOTAL_POINTS);
+
+  // Exact (not approximated) best-case total damage actually reachable by
+  // t=TOTAL_POINTS, found by dumping all points into whichever single
+  // attribute maximizes the real B^t computation. Used only to size the
+  // chart's y-axis so it's a fixed, properly-calibrated scale for the whole
+  // session — real achieved values can occasionally land a little above
+  // DMAX (see the "How it works" note in README.md on why), so the axis
+  // needs to be sized off the true max, not the approximation.
+  function trueMaxAchievable() {
+    let best = 0;
+    for (let i = 0; i < LABELS.length; i++) {
+      const x0 = BASE.slice();
+      x0[i] += TOTAL_POINTS;
+      best = Math.max(best, sum(applyPower(x0, TOTAL_POINTS)));
+    }
+    return best;
+  }
 
   // ---------- screen management ----------
 
@@ -93,9 +117,13 @@
     state.playerName = typed || "Player";
 
     state.allocation = [0, 0, 0, 0, 0];
-    const initialDamage = sum(BASE);
-    state.history = [{ t: 0, damage: initialDamage }];
-    state.maxReached = Math.max(DMAX, initialDamage);
+    state.history = [{ t: 0, damage: sum(BASE) }];
+    // Fixed once for the whole session — never recomputed, never shrinks,
+    // never grows. Calibrated off the true achievable max (not just DMAX,
+    // which real play can slightly exceed — see trueMaxAchievable above),
+    // so the scale stays legible for a typical build from the first click
+    // to the last, whether that build peaks early or late.
+    state.chartCeiling = Math.max(DMAX, trueMaxAchievable()) * 1.06;
 
     document.getElementById("submit-feedback").innerHTML = "";
 
@@ -146,7 +174,6 @@
     if (state.history.length > HISTORY_CAP) {
       state.history = state.history.slice(state.history.length - HISTORY_CAP);
     }
-    state.maxReached = Math.max(state.maxReached, damage); // ratchet up only, never down
 
     renderPlayScreen();
   }
@@ -199,27 +226,29 @@
       h = 140,
       pad = 8;
 
-    // state.maxReached only ever grows (see adjustAllocation/startGame), so
-    // the axis never rescales down and hides a regress — and it starts
-    // small (near DMAX) rather than at the global worst-case ceiling, so a
-    // typical build's rises and falls stay visually legible instead of
-    // being squeezed into a sliver at the bottom of the chart.
-    const yMax = state.maxReached * 1.06;
+    // Fixed once at game start (see startGame) and never changed — no
+    // rescaling, no ratcheting — so both curves below share one stable
+    // frame for the whole session.
+    const yMax = state.chartCeiling;
 
     const xAt = (t) => pad + (t / TOTAL_POINTS) * (w - 2 * pad);
     const yAt = (value) => h - pad - (Math.max(0, Math.min(value, yMax)) / yMax) * (h - 2 * pad);
 
+    // your actual output: a trail of every (points spent, real achieved
+    // damage) state visited this session, so it progresses AND retraces as
+    // points are added and removed
     const pts = state.history.map((e) => `${xAt(e.t).toFixed(1)},${yAt(e.damage).toFixed(1)}`);
     svg.querySelector("#growth-poly").setAttribute("points", pts.join(" "));
 
-    // DMAX is a fixed constant (see above) — not tied to any particular t —
-    // so it's drawn as a horizontal line spanning the full chart width.
-    const yRef = yAt(DMAX).toFixed(1);
-    const line = svg.querySelector("#max-ref-line");
-    line.setAttribute("x1", pad.toFixed(1));
-    line.setAttribute("x2", (w - pad).toFixed(1));
-    line.setAttribute("y1", yRef);
-    line.setAttribute("y2", yRef);
+    // theoretical benchmark: the idealized curve theoreticalD(t) for
+    // t = 0..TOTAL_POINTS, drawn once per render (cheap — 51 points) but
+    // otherwise identical every time, since it doesn't depend on the
+    // player's choices at all. It ends exactly at DMAX when t = TOTAL_POINTS.
+    const refPts = [];
+    for (let t = 0; t <= TOTAL_POINTS; t++) {
+      refPts.push(`${xAt(t).toFixed(1)},${yAt(theoreticalD(t)).toFixed(1)}`);
+    }
+    svg.querySelector("#max-ref-line").setAttribute("points", refPts.join(" "));
 
     document.getElementById("theoretical-max-value").textContent = DMAX.toFixed(2);
   }

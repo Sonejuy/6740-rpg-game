@@ -27,36 +27,47 @@ where `B` is the fixed, symmetric synergy matrix (see the in-app "How to
 play" section for every synergy percentage). Total damage output is
 `1^T x_t` — the effective attributes summed.
 
-The right-hand "Damage output" chart traces total damage as the player
-adds/removes points, against a dashed horizontal **D_max** benchmark line:
+The right-hand "Damage output" chart plots two curves against points spent
+(`t`, from 0 to 50):
+
+- **your output** (teal, solid) — the player's real, allocation-dependent
+  total damage, `1^T x_t`, traced as a trail over every state visited this
+  session. It progresses and retraces exactly as points are added and
+  removed.
+- **theoretical max** (gold, dashed) — a fixed, idealized benchmark curve
+  that does **not** depend on the player's choices at all:
 
 ```
-D_max = 1^T c1 λ1^Tmax v1,   c1 = (v1 · x0) / (v1 · v1)
+D_t = c_t · λ1^t · v1,      c_t = (1^T x0 + t) / (1^T v1)
 ```
 
-using the slides' own asymptotic approximation (section 2.4–2.5), with
-`x0 = BASE = (1,1,1,1,1)` (the fixed starting vector, *not* the player's
-allocation) and `Tmax = TOTAL_POINTS = 50`. Since `B`, `BASE`, and
-`TOTAL_POINTS` are all fixed, `D_max` is a single constant — the projected
-long-run total damage if the untouched starting profile were simply run
-through the synergy dynamics for all 50 rounds with no points spent at
-all. It does **not** depend on the player's build; it's a fixed baseline
-to build past, not a per-build target. With the current matrix:
+using the slides' own asymptotic approximation (section 2.4–2.5), dominant
+mode only, with `x0 = BASE = (1,1,1,1,1)` (the fixed starting vector, *not*
+the player's allocation). This represents "if every point spent so far had
+been funneled straight along the strongest growth direction" — independent
+of which attribute was actually chosen. `(1^T v1)` cancels out of the
+scalar total algebraically, so it simplifies to `D_t = (1^T x0 + t) · λ1^t`.
+`D_max` is just this curve's value at `t = TOTAL_POINTS = 50`, a single
+fixed constant:
 
 ```
-D_max (asymptotic formula) ≈ 90.68
-exact B^50 · BASE, summed  ≈ 90.89   (see "Eigenvalues and eigenvectors" below)
+D_max = D_50 = (5 + 50) · 1.06^50 ≈ 1013.11
 ```
 
-The small gap between the two is expected: the formula keeps only the
-dominant eigen-mode, and with equal eigengaps (`0.03` apart) the other
-modes haven't fully decayed away even by round 50.
+Because the curve only keeps the dominant eigen-mode, it's an
+approximation, not a strict ceiling: with equal eigengaps (`0.03` apart)
+the other modes haven't fully decayed away even by round 50, so a real
+build picks up extra growth from those modes that this idealized curve
+doesn't track. Concretely, dumping all 50 points into Fire (the attribute
+with the largest component of `v1`) reaches an exact total of `≈ 1139.87`
+at `t = 50` — a little *above* `D_max`. That's expected, not a bug.
 
-The chart's y-axis ratchets up to the highest total damage the player has
-reached so far this session (seeded at `D_max` so the benchmark line is
-visible from the start) and **never shrinks** — so removing points always
-shows a visible drop in the curve against a stable frame, instead of the
-axis rescaling down and hiding the regress.
+The chart's y-axis is fixed once at the start of each game (calibrated off
+whichever is larger, `D_max` or the true best-case total reachable by
+dumping all 50 points into a single attribute) and never rescales
+afterward — so both curves share one stable frame all session, and
+removing points always shows a clear, proportional drop instead of the
+axis shrinking (or an earlier peak permanently flattening later exploration).
 
 ## Eigenvalues and eigenvectors
 

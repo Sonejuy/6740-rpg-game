@@ -20,20 +20,21 @@
  *   - The displayed "Effective Attribute Profile" is x_t = B^t * x0 —
  *     i.e. the raw allocation run through t rounds of the fixed synergy
  *     interaction. Total damage output = 1^T x_t (just the bars summed).
- *   - "D_max" (shown as the dashed benchmark line) is the slides' own
- *     asymptotic approximation (section 2.4-2.5): D_t ~ c1 * lambda1^t * v1,
- *     where c1 = (v1 . x0) / (v1 . v1) = (v1 . x0) since v1 is unit-norm.
- *     It's evaluated with x0 = BASE (the FIXED starting vector (1,1,1,1,1),
- *     not the player's current allocation) and t = TOTAL_POINTS — so it's a
- *     single constant, computed once: the projected long-run damage if the
- *     untouched starting profile were simply run through the dynamics for
- *     the full 50 rounds with no points spent at all. It does not depend on
- *     how the player builds; it's a fixed benchmark to build past. Because
- *     it drops the non-dominant eigen-modes, it's an approximation of
- *     that baseline, not exact: with equal eigengaps the other modes
- *     haven't fully decayed away even by t=50, so the exact value is
- *     slightly different (see README.md for the exact-vs-approximate
- *     comparison). That's expected, not a bug.
+ *   - The dashed "theoretical" curve (app.js: theoreticalD(t)) is a
+ *     SEPARATE, idealized benchmark — not a tracking of the player's real
+ *     build. It's the slides' own asymptotic approximation (section
+ *     2.4-2.5), dominant mode only: D_t ~ c_t * lambda1^t * v1, but with
+ *     c_t = (1^T x0 + t) / (1^T v1) where x0 = BASE (fixed) and t ranges
+ *     over the whole game (0 to TOTAL_POINTS) — i.e. "if every point spent
+ *     so far had been funneled straight along the strongest growth
+ *     direction," independent of which attribute the player actually
+ *     chose. "D_max" is just this curve's value at t = TOTAL_POINTS, a
+ *     single fixed constant. Because it drops the non-dominant eigen-modes,
+ *     it's an approximation: with equal eigengaps the other modes haven't
+ *     fully decayed away even by t=50, so a real build's actual total
+ *     (which DOES pick up some of that non-dominant-mode contribution) can
+ *     land a little above this curve. That's expected, not a bug — see
+ *     README.md for the exact-vs-approximate comparison.
  */
 
 const LABELS = ["Fire", "Water", "Earth", "Wind", "Physical"];

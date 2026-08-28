@@ -307,9 +307,12 @@ main {
 }
 
 .growth-chart #max-ref-line {
+  fill: none;
   stroke: var(--gold);
   stroke-width: 2.5;
   stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .chart-legend {

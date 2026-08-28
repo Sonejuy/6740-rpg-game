@@ -65,14 +65,14 @@
         <div class="play-col">
           <h3 class="col-title">Damage output</h3>
           <svg id="growth-chart" class="growth-chart" viewBox="0 0 260 140" preserveAspectRatio="none">
-            <line id="max-ref-line" x1="0" y1="0" x2="0" y2="0" />
+            <polyline id="max-ref-line" points="" />
             <polyline id="growth-poly" points="" />
           </svg>
           <div class="chart-legend">
             <span><span class="legend-dot dot-curve"></span>your output</span>
             <span><span class="legend-dot dot-max"></span>theoretical max: <span id="theoretical-max-value">—</span></span>
           </div>
-          <p class="hint">The dashed line is a fixed benchmark: the projected long-run damage of your untouched starting profile (1,1,1,1,1) if simply run through the synergy dynamics for all 50 rounds — no points spent. Build to beat it.</p>
+          <p class="hint">The dashed curve is a fixed benchmark: the idealized growth you'd get by funneling every point spent so far straight along the strongest growth direction — it doesn't depend on which attributes you actually chose. It reaches the theoretical max exactly at 50 points spent. Your actual output (teal) can land a little above or below it, since a real build picks up extra growth this idealized curve doesn't track.</p>
         </div>
       </div>
 
