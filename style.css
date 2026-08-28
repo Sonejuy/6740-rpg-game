@@ -505,36 +505,30 @@ main {
   flex-shrink: 0;
 }
 
-/* printed-formula rendering for the Gt(x) hint — a stacked fraction, not raw LaTeX */
-
-.formula-hint {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.35em;
-}
+/* printed-formula rendering for the Gt(x) hint — a stacked fraction, not raw
+   LaTeX. Deliberately NOT flex-based: an inline-flex container mixing raw
+   text nodes with element children (like "Gt(x) = " followed by a <span>)
+   renders inconsistently across browsers. This uses the classic, universally
+   reliable technique instead — an inline-block wrapper around two stacked
+   block-level rows, laid out via ordinary text flow. */
 
 .formula {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
   font-family: "Space Mono", monospace;
   color: var(--ink);
-  white-space: nowrap;
 }
 
 .frac {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
+  display: inline-block;
   vertical-align: middle;
-  line-height: 1.15;
-  margin: 0 0.15em;
+  text-align: center;
+  line-height: 1.3;
+  margin: 0 0.2em;
 }
 
 .frac-num,
 .frac-den {
-  padding: 0 0.15em;
+  display: block;
+  padding: 0 0.2em;
 }
 
 .frac-num {
