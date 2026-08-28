@@ -13,7 +13,6 @@
   "use strict";
 
   const SCORE_LOG_KEY = "eigenQuestScoreLog";
-  const HISTORY_CAP = 400;
 
   // ---------- linear algebra helpers ----------
 
@@ -49,9 +48,6 @@
   const state = {
     playerName: "Player",
     allocation: [0, 0, 0, 0, 0],
-    history: [], // [{ t, damage }] chronological trace of ACTUAL achieved
-                 // damage, can move forward or backward as points are
-                 // added/removed
     chartCeiling: 1, // fixed y-axis scale for the whole session, set once in startGame()
   };
 
@@ -117,7 +113,6 @@
     state.playerName = typed || "Player";
 
     state.allocation = [0, 0, 0, 0, 0];
-    state.history = [{ t: 0, damage: sum(BASE) }];
     // Fixed once for the whole session — never recomputed, never shrinks,
     // never grows. Calibrated off the true achievable max (not just DMAX,
     // which real play can slightly exceed — see trueMaxAchievable above),
@@ -145,7 +140,7 @@
         <span class="dot" style="background:${COLORS[label]}"></span>
         <span class="alloc-label">${label}</span>
         <button class="alloc-btn alloc-down" data-i="${i}" aria-label="Decrease ${label}">−</button>
-        <span class="alloc-count" id="alloc-count-${i}">0</span>
+        <span class="alloc-count" id="alloc-count-${i}">${BASE[i]}</span>
         <button class="alloc-btn alloc-up" data-i="${i}" aria-label="Increase ${label}">+</button>
       `;
       wrap.appendChild(row);
@@ -165,15 +160,6 @@
     if (delta < 0 && state.allocation[i] <= 0) return;
 
     state.allocation[i] += delta;
-
-    const x0 = currentX0();
-    const t = currentT();
-    const effective = applyPower(x0, t);
-    const damage = sum(effective);
-    state.history.push({ t, damage });
-    if (state.history.length > HISTORY_CAP) {
-      state.history = state.history.slice(state.history.length - HISTORY_CAP);
-    }
 
     renderPlayScreen();
   }
@@ -210,43 +196,53 @@
     const remaining = TOTAL_POINTS - t;
     document.getElementById("remaining-points").textContent = remaining;
     LABELS.forEach((label, i) => {
-      document.getElementById(`alloc-count-${i}`).textContent = state.allocation[i];
+      // shows the raw attribute value x0_i = BASE[i] + points spent here,
+      // not just points spent — so it never reads below its starting value
+      document.getElementById(`alloc-count-${i}`).textContent = BASE[i] + state.allocation[i];
     });
     document.querySelectorAll(".alloc-up").forEach((btn) => (btn.disabled = remaining <= 0));
     document.querySelectorAll(".alloc-down").forEach((btn) => {
       btn.disabled = state.allocation[Number(btn.dataset.i)] <= 0;
     });
 
-    renderGrowthChart();
+    renderGrowthChart(t, total);
   }
 
-  function renderGrowthChart() {
+  function renderGrowthChart(t, total) {
     const svg = document.getElementById("growth-chart");
     const w = 260,
       h = 140,
       pad = 8;
 
     // Fixed once at game start (see startGame) and never changed — no
-    // rescaling, no ratcheting — so both curves below share one stable
-    // frame for the whole session.
+    // rescaling, no ratcheting — so both marks below share one stable frame
+    // for the whole session.
     const yMax = state.chartCeiling;
 
     const xAt = (t) => pad + (t / TOTAL_POINTS) * (w - 2 * pad);
     const yAt = (value) => h - pad - (Math.max(0, Math.min(value, yMax)) / yMax) * (h - 2 * pad);
 
-    // your actual output: a trail of every (points spent, real achieved
-    // damage) state visited this session, so it progresses AND retraces as
-    // points are added and removed
-    const pts = state.history.map((e) => `${xAt(e.t).toFixed(1)},${yAt(e.damage).toFixed(1)}`);
-    svg.querySelector("#growth-poly").setAttribute("points", pts.join(" "));
+    // your actual output: a single marker at the CURRENT (points spent,
+    // real achieved damage) position — not a trail of every past state.
+    // A trailing polyline of full session history used to connect points
+    // chronologically even when the player had jumped between very
+    // different builds at the same point-total (e.g. "all-in Fire" then
+    // "all-in Water" both sit at t=50 but ~200 apart in damage) — plotted
+    // as one continuous line, that produced a tangle of crossing segments
+    // that looked broken. A single marker always shows exactly where the
+    // CURRENT build stands, and still visibly moves right/up when points
+    // are added and left/down when removed.
+    const marker = svg.querySelector("#growth-poly");
+    marker.setAttribute("cx", xAt(t).toFixed(1));
+    marker.setAttribute("cy", yAt(total).toFixed(1));
 
     // theoretical benchmark: the idealized curve theoreticalD(t) for
     // t = 0..TOTAL_POINTS, drawn once per render (cheap — 51 points) but
     // otherwise identical every time, since it doesn't depend on the
     // player's choices at all. It ends exactly at DMAX when t = TOTAL_POINTS.
     const refPts = [];
-    for (let t = 0; t <= TOTAL_POINTS; t++) {
-      refPts.push(`${xAt(t).toFixed(1)},${yAt(theoreticalD(t)).toFixed(1)}`);
+    for (let tt = 0; tt <= TOTAL_POINTS; tt++) {
+      refPts.push(`${xAt(tt).toFixed(1)},${yAt(theoreticalD(tt)).toFixed(1)}`);
     }
     svg.querySelector("#max-ref-line").setAttribute("points", refPts.join(" "));
 
