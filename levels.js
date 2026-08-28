@@ -1,28 +1,36 @@
 /**
  * levels.js
  *
- * The one "world" Eigen-Quest plays out on: a fixed, pre-balanced linear
- * dynamical system —
+ * Eigen-Quest is now a build simulator on a single fixed, symmetric
+ * synergy matrix with equally-spaced eigenvalues:
  *
- *   D_{t+1} = B * D_t + u_t
+ *   eigenvalues:  1.06, 1.03, 1.00, 0.97, 0.94   (gap = 0.03 throughout)
  *
- * where B = I + A is the synergy matrix (A[i][j] = the fractional boost
- * damage type j gives damage type i, per turn), D_t is the damage-type
- * vector, and u_t is the player's level-up choice (a one-hot vector).
+ * Because B is symmetric, its eigenvectors are exactly orthogonal, which
+ * is what makes the "theoretical max" formula below well-defined (it's a
+ * clean orthogonal projection, not an approximation of one).
  *
- * This is the exact matrix and starting state from the OMS 6740 linear
- * algebra review's worked example.
- *
- * `theoreticalMax` is the best total damage achievable after `maxTurns`
- * turns under ANY sequence of level-up choices — computed once, offline.
- * It has a closed form here because each turn's contribution to the final
- * total is independent of every other turn's choice:
- *
- *   1^T D_T = 1^T B^T D0 + sum_{t=0}^{T-1} (1^T B^{T-1-t}) . u_t
- *
- * so the optimal u_t just maximizes its own term — no simulation or search
- * needed. (Verified two ways: this closed form, and simulating the
- * resulting optimal per-turn choices end to end — both give 178.071089.)
+ * Model:
+ *   - BASE = (1,1,1,1,1) is the starting attribute vector before any
+ *     points are spent.
+ *   - The player freely distributes up to TOTAL_POINTS points across the
+ *     5 attributes (can add/remove anytime) — call that allocation p.
+ *   - x0 = BASE + p is the raw (pre-synergy) attribute vector.
+ *   - t = sum(p), the total points currently spent.
+ *   - The displayed "Effective Attribute Profile" is x_t = B^t * x0 —
+ *     i.e. the raw allocation run through t rounds of the fixed synergy
+ *     interaction. Total damage output = 1^T x_t (just the bars summed).
+ *   - "Theoretical max" is the slides' own asymptotic approximation
+ *     (section 2.4-2.5): D_t ~ c1 * lambda1^t * v1, where
+ *     c1 = (v1 . x0) / (v1 . v1) = (v1 . x0) since v1 is unit-norm.
+ *     It's evaluated at t = TOTAL_POINTS (the full 50-point game) using
+ *     whichever x0 the player's CURRENT allocation produces — so it's a
+ *     moving target that reflects the build direction you're currently
+ *     exploring, not a fixed number. Because it drops the non-dominant
+ *     eigen-modes, it's an approximation, not a strict ceiling: with
+ *     equal eigengaps the other modes haven't fully decayed away even by
+ *     t=50, so the true value can occasionally land a little above or
+ *     below this line. That's expected, not a bug.
  */
 
 const LABELS = ["Fire", "Water", "Earth", "Wind", "Physical"];
@@ -35,22 +43,21 @@ const COLORS = {
   Physical: "#9aa5b1",
 };
 
-const LEVEL = {
-  name: "Maximize your damage output",
-  labels: LABELS,
-  colors: COLORS,
-  D0: [10, 8, 6, 7, 9],
-  B: [
-    [1.00, 0.00, 0.01, 0.06, 0.03],
-    [0.00, 1.00, 0.00, 0.00, 0.01],
-    [0.00, 0.05, 1.00, 0.00, 0.00],
-    [0.04, 0.02, 0.01, 1.00, 0.00],
-    [0.02, 0.00, 0.06, 0.02, 1.00],
-  ],
-  maxTurns: 20,
-  theoreticalMax: 178.071089,
-};
+const BASE = [1, 1, 1, 1, 1];
+const TOTAL_POINTS = 50;
+
+const B = [
+  [1.038519, 0.006505, 0.005886, 0.007125, 0.007435],
+  [0.006505, 1.011905, 0.010771, 0.013039, 0.013606],
+  [0.005886, 0.010771, 0.987133, 0.020740, 0.021642],
+  [0.007125, 0.013039, 0.020740, 0.979468, 0.041184],
+  [0.007435, 0.013606, 0.021642, 0.041184, 0.982975],
+];
+
+// dominant eigenpair of B, computed offline (see comment above)
+const LAMBDA1 = 1.06;
+const V1 = [0.532888, 0.406914, 0.368169, 0.445675, 0.465056]; // unit norm
 
 if (typeof module !== "undefined") {
-  module.exports = { LABELS, COLORS, LEVEL };
+  module.exports = { LABELS, COLORS, BASE, TOTAL_POINTS, B, LAMBDA1, V1 };
 }

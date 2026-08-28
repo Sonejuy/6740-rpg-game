@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Eigen-Quest — a linear algebra learning game</title>
-<meta name="description" content="Build an RPG damage profile turn by turn and see how close you can get to the theoretical best build. Built for OMS 6740." />
+<meta name="description" content="Distribute attribute points, watch synergy interactions play out, and see how close you can get to the theoretical best build. Built for OMS 6740." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,9 +25,9 @@
     <div class="panel title-panel">
       <h1>Eigen-Quest</h1>
       <p class="lede">
-        You're building a character's damage profile, one level-up at a time.
-        Play a few turns, watch your build take shape, and try to get as
-        close as you can to the best possible outcome.
+        You're building a character's attribute profile. Distribute your
+        points, watch how the attributes interact, and try to get as close
+        as you can to the best possible outcome.
       </p>
       <button id="begin-btn" class="btn btn-primary">Begin</button>
     </div>
@@ -48,13 +48,12 @@
   <section id="screen-play" class="screen">
     <div class="panel play-panel">
       <div class="play-header">
-        <h2 id="play-level-name">—</h2>
-        <span id="turn-counter" class="turn-counter">Turn 0 / 0</span>
+        <h2>Maximize your damage output</h2>
       </div>
 
       <div class="play-grid">
         <div class="play-col">
-          <h3 class="col-title">Damage profile</h3>
+          <h3 class="col-title">Effective attribute profile</h3>
           <div id="damage-bars" class="damage-bars"></div>
 
           <div class="total-damage-block">
@@ -64,7 +63,7 @@
         </div>
 
         <div class="play-col">
-          <h3 class="col-title">Damage output over time</h3>
+          <h3 class="col-title">Damage output</h3>
           <svg id="growth-chart" class="growth-chart" viewBox="0 0 260 140" preserveAspectRatio="none">
             <line id="max-ref-line" x1="0" y1="0" x2="0" y2="0" />
             <polyline id="growth-poly" points="" />
@@ -73,35 +72,37 @@
             <span><span class="legend-dot dot-curve"></span>your output</span>
             <span><span class="legend-dot dot-max"></span>theoretical max: <span id="theoretical-max-value">—</span></span>
           </div>
-          <p class="hint">The dashed line marks the best possible total damage for this matrix and turn count — see how close you can get.</p>
+          <p class="hint">The dashed line marks the theoretical best for your current build direction — see how close you can get.</p>
         </div>
       </div>
 
-      <h3 class="col-title levelup-title">Level up</h3>
-      <div id="levelup-buttons" class="levelup-buttons"></div>
+      <div class="alloc-header">
+        <h3 class="col-title levelup-title">Level up</h3>
+        <span class="remaining-points">Points remaining: <strong id="remaining-points">50</strong></span>
+      </div>
+      <div id="alloc-rows" class="alloc-rows"></div>
 
-      <div id="endgame-panel" class="endgame-panel hidden">
-        <div id="endgame-prompt" class="endgame-block">
-          <p class="endgame-question">Game over — final total damage: <strong id="endgame-score">0.00</strong></p>
-          <p>Would you like to upload your score?</p>
-          <div class="endgame-actions">
-            <button id="score-yes-btn" class="btn btn-primary">Yes</button>
-            <button id="score-no-btn" class="btn btn-secondary">No</button>
-          </div>
-        </div>
-        <div id="endgame-result" class="endgame-block hidden"></div>
-        <button id="play-again-btn" class="btn btn-secondary hidden">Play again</button>
+      <div class="submit-score-block">
+        <button id="submit-score-btn" class="btn btn-primary">Submit Score</button>
+        <p class="hint">You can submit your score at any time by clicking "Submit Score".</p>
+        <div id="submit-feedback"></div>
       </div>
 
       <div class="howto">
         <h3 class="col-title">How to play</h3>
         <p class="hint">
-          Each turn, pick one damage type to level up — it gets +1, then every
-          type feeds into the others by its fixed synergy percentage before
-          your next turn. There are <span id="max-turns-value">—</span> turns;
-          try to maximize total damage output by the end.
+          You start at (1, 1, 1, 1, 1) and have <span id="total-points-value">—</span>
+          points to distribute across the five attributes — add or remove
+          them anytime with the +/− controls above. Your raw attribute
+          vector then runs through the fixed synergy matrix once per point
+          spent, so the effective profile above reflects both how many
+          points you spent and where you put them. Try to maximize total
+          damage output.
         </p>
+        <h4 class="subhead">Synergy between attributes (symmetric — applies both ways)</h4>
         <div id="synergy-list" class="synergy-list"></div>
+        <h4 class="subhead">Self-growth / self-decay per round</h4>
+        <div id="self-effect-list" class="synergy-list"></div>
       </div>
     </div>
   </section>
@@ -109,7 +110,7 @@
 </main>
 
 <footer class="footer">
-  Built for OMS 6740 · no login — score uploads are saved locally in your browser.
+  Built for OMS 6740 · no login — score submissions are saved locally in your browser.
 </footer>
 
 <script src="levels.js"></script>
