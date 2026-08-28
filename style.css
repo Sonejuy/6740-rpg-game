@@ -360,6 +360,12 @@ main {
   margin-bottom: 0;
 }
 
+.alloc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
 .remaining-points {
   font-family: "Space Mono", monospace;
   font-size: 0.85rem;
@@ -369,6 +375,11 @@ main {
 .remaining-points strong {
   color: var(--gold);
   font-size: 1rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
 }
 
 .alloc-rows {
@@ -492,4 +503,40 @@ main {
   border-radius: 50%;
   margin-right: 0.5rem;
   flex-shrink: 0;
+}
+
+/* printed-formula rendering for the Gt(x) hint — a stacked fraction, not raw LaTeX */
+
+.formula-hint {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35em;
+}
+
+.formula {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: "Space Mono", monospace;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.15;
+  margin: 0 0.15em;
+}
+
+.frac-num,
+.frac-den {
+  padding: 0 0.15em;
+}
+
+.frac-num {
+  border-bottom: 1px solid var(--ink);
 }

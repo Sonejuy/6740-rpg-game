@@ -72,13 +72,16 @@
             <span><span class="legend-dot dot-curve"></span>your output</span>
             <span><span class="legend-dot dot-max"></span>theoretical max: <span id="theoretical-max-value">—</span></span>
           </div>
-          <p class="hint">The dashed curve is a fixed benchmark: the growth you'd get from a build shaped exactly like the matrix's strongest growth direction — it doesn't depend on which attributes you actually chose. It reaches the theoretical max exactly at 50 points spent. Your actual output (teal) gets close the more your build's shape resembles that direction, but essentially never beats it — see the in-app hint below for why.</p>
+          <p class="hint">The dashed line is a fixed benchmark: the total damage a build shaped exactly like the matrix's strongest growth direction would reach at all 50 points spent — it doesn't depend on which attributes you actually chose. Your actual output (teal dot) gets close the more your build's shape resembles that direction, but essentially never beats it — see the in-app hint below for why.</p>
         </div>
       </div>
 
       <div class="alloc-header">
         <h3 class="col-title levelup-title">Level up</h3>
-        <span class="remaining-points">Points remaining: <strong id="remaining-points">50</strong></span>
+        <div class="alloc-header-right">
+          <span class="remaining-points">Points remaining: <strong id="remaining-points">50</strong></span>
+          <button id="reset-alloc-btn" class="btn btn-secondary btn-sm">Reset</button>
+        </div>
       </div>
       <div id="alloc-rows" class="alloc-rows"></div>
 
@@ -103,14 +106,16 @@
         </p>
         <h4 class="subhead">Synergy between attributes (symmetric — applies both ways)</h4>
         <div id="synergy-list" class="synergy-list"></div>
-        <p class="hint">
+        <p class="hint formula-hint">
           <strong>Hint:</strong> the synergy is further realized through the
-          mechanic G<sub>t</sub>(x) = (B<sup>t</sup>x) / ‖x‖<sub>2</sub> — each
-          attribute's effective power is the raw synergy transform divided by
-          your whole build's overall size (its length as a vector). That
-          division is exactly why a lopsided, single-attribute build no
-          longer wins — only a build shaped like the matrix's own strongest
-          growth direction gets close to the theoretical max.
+          mechanic
+          <span class="formula">G<sub>t</sub>(x) = <span class="frac"><span class="frac-num">‖B<sup>t</sup>x‖<sub>2</sub></span><span class="frac-den">‖x‖<sub>2</sub></span></span></span>
+          — each attribute's effective power comes from the raw synergy
+          transform, rescaled by your whole build's overall size (its length
+          as a vector). That rescaling is exactly why a lopsided,
+          single-attribute build no longer wins — only a build shaped like
+          the matrix's own strongest growth direction gets close to the
+          theoretical max.
         </p>
       </div>
     </div>

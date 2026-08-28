@@ -158,6 +158,12 @@
     renderPlayScreen();
   }
 
+  function resetAllocation() {
+    state.allocation = [0, 0, 0, 0, 0];
+    document.getElementById("submit-feedback").innerHTML = "";
+    renderPlayScreen();
+  }
+
   // ---------- rendering ----------
 
   function renderPlayScreen() {
@@ -230,15 +236,11 @@
     marker.setAttribute("cx", xAt(t).toFixed(1));
     marker.setAttribute("cy", yAt(total).toFixed(1));
 
-    // theoretical benchmark: the idealized curve theoreticalD(t) for
-    // t = 0..TOTAL_POINTS, drawn once per render (cheap — 51 points) but
-    // otherwise identical every time, since it doesn't depend on the
-    // player's choices at all. It ends exactly at DMAX when t = TOTAL_POINTS.
-    const refPts = [];
-    for (let tt = 0; tt <= TOTAL_POINTS; tt++) {
-      refPts.push(`${xAt(tt).toFixed(1)},${yAt(theoreticalD(tt)).toFixed(1)}`);
-    }
-    svg.querySelector("#max-ref-line").setAttribute("points", refPts.join(" "));
+    // theoretical benchmark: a flat horizontal line at DMAX (the value of
+    // theoreticalD at t = TOTAL_POINTS only) — a single fixed reference
+    // level, not a curve over every intermediate t.
+    const yRef = yAt(DMAX).toFixed(1);
+    svg.querySelector("#max-ref-line").setAttribute("points", `${pad},${yRef} ${w - pad},${yRef}`);
 
     document.getElementById("theoretical-max-value").textContent = DMAX.toFixed(2);
   }
@@ -342,6 +344,8 @@
     });
 
     document.getElementById("submit-score-btn").addEventListener("click", submitScore);
+
+    document.getElementById("reset-alloc-btn").addEventListener("click", resetAllocation);
 
     document.getElementById("title-link").addEventListener("click", (e) => {
       e.preventDefault();
