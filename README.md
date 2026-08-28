@@ -15,59 +15,67 @@ backend.
 The player starts at the base attribute vector `x0 = (1,1,1,1,1)` and has
 `TOTAL_POINTS = 50` points to distribute freely across the 5 attributes —
 add or remove them at any time with the +/− controls, in any order, any
-number of times. Let `p` be the current allocation and `t = sum(p)` the
-total points currently spent. The raw (pre-synergy) vector is `x0 + p`, and
-the **effective attribute profile** shown in the left column is:
+number of times. Let `p` be the current allocation, `t = sum(p)` the total
+points currently spent, and `x = x0 + p` the raw (pre-synergy) attribute
+vector. The **effective element power** shown in the left column is:
 
 ```
-x_t = B^t · (x0 + p)
+G_t(x) = (B^t · x) / ‖x‖2
 ```
 
-where `B` is the fixed, symmetric synergy matrix (see the in-app "How to
-play" section for every synergy percentage). Total damage output is
-`1^T x_t` — the effective attributes summed.
+— the raw allocation run through `t` rounds of the fixed synergy matrix
+`B` (see the in-app "How to play" section for every synergy percentage),
+then rescaled by the build's own overall size (`‖x‖2`, its length as a
+vector). Total damage output is `1^T G_t(x)` — the effective element
+powers summed.
 
-The right-hand "Damage output" chart plots two curves against points spent
-(`t`, from 0 to 50):
+**Why divide by `‖x‖2`?** An earlier version used the raw, unnormalized
+`B^t · x` for both the bars and the total. That total is genuinely
+*linear* in the allocation once `t` is fixed at `TOTAL_POINTS` — and a
+linear function over the feasible region (points ≥ 0, summing to
+`TOTAL_POINTS`, i.e. a simplex) is always maximized at a **vertex** of
+that simplex, meaning dumping every point into a single attribute. That's
+an artifact of it being an unconstrained linear program; it has nothing
+to do with `v1` in general, and in practice the single best attribute
+(Fire) beat a build shaped like `v1` by a wide margin. Dividing by `‖x‖2`
+makes the metric depend only on `x`'s *direction*, not its magnitude — a
+scale-invariant, Rayleigh-quotient-style ratio that, by the
+Cauchy-Schwarz inequality, is maximized when `x` points the same way as
+`v1`, not by concentrating mass in one coordinate. That's what makes
+"build toward the dominant eigenvector" the actual best strategy, matching
+the point of the exercise.
 
-- **your output** (teal, solid) — the player's real, allocation-dependent
-  total damage, `1^T x_t`, traced as a trail over every state visited this
-  session. It progresses and retraces exactly as points are added and
-  removed.
-- **theoretical max** (gold, dashed) — a fixed, idealized benchmark curve
-  that does **not** depend on the player's choices at all:
+The right-hand "Damage output" chart plots, against points spent (`t`,
+from 0 to 50):
+
+- **your output** (teal dot) — the player's real, allocation-dependent
+  total, `1^T G_t(x)`, at the current build. It's a single marker, not a
+  trail — it moves right/up as points are added and left/down as they're
+  removed, and never leaves a tangle behind when you switch strategies.
+- **theoretical max** (gold, dashed curve) — a fixed benchmark, independent
+  of the player's build: this same formula evaluated *at `x = v1` exactly*.
+  Because `v1` is an eigenvector of `B`, `B^t · v1 = λ1^t · v1` **exactly**
+  for every `t` — no dropped modes, no approximation:
 
 ```
-D_t = c_t · λ1^t · v1,      c_t = (1^T x0 + t) / (1^T v1)
+D_t = 1^T G_t(v1) = λ1^t · (1^T v1)          (‖v1‖2 = 1, already unit-norm)
+D_max = D_50 = 1.06^50 · (1^T v1) ≈ 40.87
 ```
 
-using the slides' own asymptotic approximation (section 2.4–2.5), dominant
-mode only, with `x0 = BASE = (1,1,1,1,1)` (the fixed starting vector, *not*
-the player's allocation). This represents "if every point spent so far had
-been funneled straight along the strongest growth direction" — independent
-of which attribute was actually chosen. `(1^T v1)` cancels out of the
-scalar total algebraically, so it simplifies to `D_t = (1^T x0 + t) · λ1^t`.
-`D_max` is just this curve's value at `t = TOTAL_POINTS = 50`, a single
-fixed constant:
+Unlike the earlier (unnormalized) version of this benchmark, a real build
+can only get *negligibly* close to beating it now: by Cauchy-Schwarz, the
+true maximum of `1^T G_t(x)` over every possible direction is
+`‖B^t · 1‖2`, achieved when `x` is proportional to `B^t · 1` — and at
+`t = 50` that direction has cosine similarity `> 0.999` with `v1`, so the
+gap is under `0.03%` (verified numerically: `‖B^50 · 1‖2 ≈ 40.880` vs.
+`D_max ≈ 40.870`). Concretely, dumping all 50 points into Fire (previously
+the best strategy) now only reaches `≈ 22.33` — under 55% of `D_max` —
+while an allocation shaped like `v1` (Fire+12, Water+9, Earth+8, Wind+10,
+Physical+11) reaches `≈ 40.87`, over 99.99% of the theoretical max.
 
-```
-D_max = D_50 = (5 + 50) · 1.06^50 ≈ 1013.11
-```
-
-Because the curve only keeps the dominant eigen-mode, it's an
-approximation, not a strict ceiling: with equal eigengaps (`0.03` apart)
-the other modes haven't fully decayed away even by round 50, so a real
-build picks up extra growth from those modes that this idealized curve
-doesn't track. Concretely, dumping all 50 points into Fire (the attribute
-with the largest component of `v1`) reaches an exact total of `≈ 1139.87`
-at `t = 50` — a little *above* `D_max`. That's expected, not a bug.
-
-The chart's y-axis is fixed once at the start of each game (calibrated off
-whichever is larger, `D_max` or the true best-case total reachable by
-dumping all 50 points into a single attribute) and never rescales
-afterward — so both curves share one stable frame all session, and
-removing points always shows a clear, proportional drop instead of the
-axis shrinking (or an earlier peak permanently flattening later exploration).
+The chart's y-axis is fixed once at the start of each game (`D_max × 1.08`)
+and never rescales afterward, so the benchmark curve and the player's
+marker always share one stable frame.
 
 ## Eigenvalues and eigenvectors
 
@@ -87,9 +95,10 @@ Dominant eigenvector (unit norm, matches `V1` in `levels.js`):
 v1 = (0.532888, 0.406914, 0.368169, 0.445675, 0.465056)
 ```
 
-(Fire has the largest component, so it's the single best attribute to
-dump points into if maximizing eventual total damage is the only goal —
-see the in-app synergy list for why.)
+(Fire has the largest single component, but under the normalized damage
+formula above, the best strategy is no longer "dump everything into Fire"
+— it's building an allocation *shaped like* `v1` across all five
+attributes. See "How it works" above for the numbers.)
 
 The game never ends — there's no turn limit and no end screen. Players can
 click **Submit Score** at any point to log their current total damage.
@@ -113,7 +122,8 @@ it to an orthonormal basis via QR, and reassembling `B = V · diag(λ) · Vᵀ`
 — then verified with `eigvalsh`. All off-diagonal entries are non-negative
 (every pair of attributes boosts each other, just by different amounts);
 diagonal entries give each attribute its own per-round self-growth or
-self-decay, shown in the in-app "Self-growth / self-decay" list.
+self-decay (shown in-app only as the "Hint" formula now, not a separate
+list — see the in-app "How to play" section).
 
 ## Score logging — read this before telling students to "submit their score"
 

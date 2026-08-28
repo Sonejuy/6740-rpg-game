@@ -17,24 +17,41 @@
  *     5 attributes (can add/remove anytime) — call that allocation p.
  *   - x0 = BASE + p is the raw (pre-synergy) attribute vector.
  *   - t = sum(p), the total points currently spent.
- *   - The displayed "Effective Attribute Profile" is x_t = B^t * x0 —
- *     i.e. the raw allocation run through t rounds of the fixed synergy
- *     interaction. Total damage output = 1^T x_t (just the bars summed).
- *   - The dashed "theoretical" curve (app.js: theoreticalD(t)) is a
- *     SEPARATE, idealized benchmark — not a tracking of the player's real
- *     build. It's the slides' own asymptotic approximation (section
- *     2.4-2.5), dominant mode only: D_t ~ c_t * lambda1^t * v1, but with
- *     c_t = (1^T x0 + t) / (1^T v1) where x0 = BASE (fixed) and t ranges
- *     over the whole game (0 to TOTAL_POINTS) — i.e. "if every point spent
- *     so far had been funneled straight along the strongest growth
- *     direction," independent of which attribute the player actually
- *     chose. "D_max" is just this curve's value at t = TOTAL_POINTS, a
- *     single fixed constant. Because it drops the non-dominant eigen-modes,
- *     it's an approximation: with equal eigengaps the other modes haven't
- *     fully decayed away even by t=50, so a real build's actual total
- *     (which DOES pick up some of that non-dominant-mode contribution) can
- *     land a little above this curve. That's expected, not a bug — see
- *     README.md for the exact-vs-approximate comparison.
+ *   - The displayed "Effective Element Power" is the NORMALIZED synergy
+ *     transform:
+ *         G_t(x0) = (B^t * x0) / ||x0||_2
+ *     — the raw allocation run through t rounds of the fixed synergy
+ *     interaction, then rescaled by the build's own overall size. Total
+ *     damage output = 1^T G_t(x0) (the bars summed).
+ *
+ *     Why divide by ||x0||_2? An earlier version used the raw (unnormalized)
+ *     B^t * x0 as both the bars AND the total. That total is a genuinely
+ *     LINEAR function of the allocation once t is fixed at TOTAL_POINTS, and
+ *     a linear function over the feasible region (points >= 0, summing to
+ *     TOTAL_POINTS — a simplex) is always maximized at a VERTEX of that
+ *     simplex — i.e. by dumping every point into a single attribute. That's
+ *     an artifact of it being an unconstrained linear-programming problem;
+ *     it has nothing to do with v1 in general, and indeed the single best
+ *     attribute (Fire) beat the "build toward v1" strategy by a wide margin.
+ *     Dividing by ||x0||_2 makes the metric depend only on x0's DIRECTION,
+ *     not its magnitude (a scale-invariant / Rayleigh-quotient-style ratio)
+ *     — which by the Cauchy-Schwarz inequality is maximized when x0 points
+ *     the same way as v1, not by concentrating mass in one coordinate. This
+ *     is what makes "build toward the dominant eigenvector" the actual best
+ *     strategy, matching the pedagogical point of the exercise. See
+ *     README.md for the numbers confirming this (v1-aligned builds now
+ *     roughly double what any single-attribute dump achieves).
+ *   - The dashed "theoretical" curve (app.js: theoreticalD(t)) evaluates
+ *     this same formula AT x = v1 exactly. Because v1 is an eigenvector,
+ *     B^t * v1 = lambda1^t * v1 exactly for any t — no approximation, no
+ *     dropped modes — so D_t = lambda1^t * (1^T v1) is an exact benchmark,
+ *     not an asymptotic one. "D_max" is this curve's value at
+ *     t = TOTAL_POINTS. A real build can get arbitrarily close to it (an
+ *     allocation shaped like v1, e.g. Fire+12/Water+9/Earth+8/Wind+10/
+ *     Physical+11, reaches over 99.99% of D_max) but — again by
+ *     Cauchy-Schwarz — can only exceed it by a truly negligible amount
+ *     (under 0.03% at t=50, see README.md), unlike the old formula's
+ *     double-digit-percent overshoots.
  */
 
 const LABELS = ["Fire", "Water", "Earth", "Wind", "Physical"];

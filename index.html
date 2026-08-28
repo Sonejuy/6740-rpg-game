@@ -53,7 +53,7 @@
 
       <div class="play-grid">
         <div class="play-col">
-          <h3 class="col-title">Effective attribute profile</h3>
+          <h3 class="col-title">Effective element power</h3>
           <div id="damage-bars" class="damage-bars"></div>
 
           <div class="total-damage-block">
@@ -72,7 +72,7 @@
             <span><span class="legend-dot dot-curve"></span>your output</span>
             <span><span class="legend-dot dot-max"></span>theoretical max: <span id="theoretical-max-value">—</span></span>
           </div>
-          <p class="hint">The dashed curve is a fixed benchmark: the idealized growth you'd get by funneling every point spent so far straight along the strongest growth direction — it doesn't depend on which attributes you actually chose. It reaches the theoretical max exactly at 50 points spent. Your actual output (teal) can land a little above or below it, since a real build picks up extra growth this idealized curve doesn't track.</p>
+          <p class="hint">The dashed curve is a fixed benchmark: the growth you'd get from a build shaped exactly like the matrix's strongest growth direction — it doesn't depend on which attributes you actually chose. It reaches the theoretical max exactly at 50 points spent. Your actual output (teal) gets close the more your build's shape resembles that direction, but essentially never beats it — see the in-app hint below for why.</p>
         </div>
       </div>
 
@@ -94,15 +94,24 @@
           You start at (1, 1, 1, 1, 1) and have <span id="total-points-value">—</span>
           points to distribute across the five attributes — add or remove
           them anytime with the +/− controls above. Your raw attribute
-          vector then runs through the fixed synergy matrix once per point
-          spent, so the effective profile above reflects both how many
-          points you spent and where you put them. Try to maximize total
+          vector runs through the fixed synergy matrix once per point spent,
+          then gets rescaled by your whole build's overall size — so the
+          effective element power above rewards the <em>shape</em> of your
+          build (which attributes you favor, relative to each other) more
+          than just how many points you've spent. Try to maximize total
           damage output.
         </p>
         <h4 class="subhead">Synergy between attributes (symmetric — applies both ways)</h4>
         <div id="synergy-list" class="synergy-list"></div>
-        <h4 class="subhead">Self-growth / self-decay per round</h4>
-        <div id="self-effect-list" class="synergy-list"></div>
+        <p class="hint">
+          <strong>Hint:</strong> the synergy is further realized through the
+          mechanic G<sub>t</sub>(x) = (B<sup>t</sup>x) / ‖x‖<sub>2</sub> — each
+          attribute's effective power is the raw synergy transform divided by
+          your whole build's overall size (its length as a vector). That
+          division is exactly why a lopsided, single-attribute build no
+          longer wins — only a build shaped like the matrix's own strongest
+          growth direction gets close to the theoretical max.
+        </p>
       </div>
     </div>
   </section>

@@ -37,10 +37,20 @@
     return v.reduce((a, b) => a + b, 0);
   }
 
-  function dot(a, b) {
-    let s = 0;
-    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
-    return s;
+  function norm(v) {
+    return Math.sqrt(v.reduce((a, b) => a + b * b, 0));
+  }
+
+  // The effective element power vector at t points spent:
+  //   G_t(x) = (B^t x) / ||x||_2
+  // — the raw synergy transform, rescaled by the build's own overall size.
+  // Dividing by ||x|| makes the metric depend only on x's DIRECTION, not its
+  // magnitude, which is what makes v1 (not "dump everything into one
+  // attribute") the actual best strategy — see levels.js for why.
+  function effectivePower(x, t) {
+    const raw = applyPower(x, t);
+    const n = norm(x);
+    return raw.map((v) => v / n);
   }
 
   // ---------- state ----------
@@ -59,42 +69,27 @@
     return sum(state.allocation);
   }
 
-  // Theoretical (idealized) growth curve, dominant-mode only:
-  //   D_t = c_t * lambda1^t * v1,   c_t = (1^T x0 + t) / (1^T v1)
-  // x0 here is the FIXED starting vector BASE = (1,1,1,1,1) — NOT the
-  // player's current allocation — and t ranges over [0, TOTAL_POINTS]. This
-  // represents "if every point spent so far had been funneled optimally
-  // along the dominant growth direction," independent of which attribute
-  // the player actually chose — a benchmark curve to compare the real
-  // build against, not a tracking of the real build itself. (1^T v1) cancels
-  // algebraically, so the scalar total simplifies to (1^T x0 + t) * lambda1^t,
-  // but it's computed via the literal formula below for traceability.
+  // Theoretical benchmark curve: the value of 1^T G_t(x) evaluated AT
+  // x = v1 exactly. Because v1 is an eigenvector of B, B^t v1 = lambda1^t v1
+  // exactly for every t — no dominant-mode approximation needed this time —
+  // so this simplifies to a clean closed form:
+  //   D_t = 1^T G_t(v1) = 1^T (lambda1^t v1) / ||v1||_2 = lambda1^t * (1^T v1)
+  // (||v1|| = 1, already unit-norm). This is a genuine, EXACT reference for
+  // "built perfectly toward the dominant growth direction" — and unlike the
+  // old (pre-normalization) formula, real builds can only ever get
+  // negligibly close to this, never meaningfully beat it: by Cauchy-Schwarz,
+  // the true max of 1^T G_t(x) over every possible direction x is
+  // ||B^t . 1||_2, achieved at x proportional to B^t . 1 — and at t=50 that
+  // direction has cosine similarity >0.999 with v1, so the gap is under
+  // 0.03%. See README.md for the exact numbers.
   function theoreticalD(t) {
-    const c_t = (sum(BASE) + t) / sum(V1);
-    return c_t * Math.pow(LAMBDA1, t) * sum(V1);
+    return Math.pow(LAMBDA1, t) * sum(V1);
   }
 
   // D_max = theoreticalD(TOTAL_POINTS) — the curve's value at full spend.
-  // Since BASE, B, and TOTAL_POINTS are all fixed, this is a single
-  // constant, not a per-build number that moves as the player reallocates.
+  // Since B and TOTAL_POINTS are fixed and v1 doesn't depend on the
+  // player's build, this is a single constant.
   const DMAX = theoreticalD(TOTAL_POINTS);
-
-  // Exact (not approximated) best-case total damage actually reachable by
-  // t=TOTAL_POINTS, found by dumping all points into whichever single
-  // attribute maximizes the real B^t computation. Used only to size the
-  // chart's y-axis so it's a fixed, properly-calibrated scale for the whole
-  // session — real achieved values can occasionally land a little above
-  // DMAX (see the "How it works" note in README.md on why), so the axis
-  // needs to be sized off the true max, not the approximation.
-  function trueMaxAchievable() {
-    let best = 0;
-    for (let i = 0; i < LABELS.length; i++) {
-      const x0 = BASE.slice();
-      x0[i] += TOTAL_POINTS;
-      best = Math.max(best, sum(applyPower(x0, TOTAL_POINTS)));
-    }
-    return best;
-  }
 
   // ---------- screen management ----------
 
@@ -114,11 +109,10 @@
 
     state.allocation = [0, 0, 0, 0, 0];
     // Fixed once for the whole session — never recomputed, never shrinks,
-    // never grows. Calibrated off the true achievable max (not just DMAX,
-    // which real play can slightly exceed — see trueMaxAchievable above),
-    // so the scale stays legible for a typical build from the first click
-    // to the last, whether that build peaks early or late.
-    state.chartCeiling = Math.max(DMAX, trueMaxAchievable()) * 1.06;
+    // never grows. DMAX is now an effectively-tight ceiling (see theoreticalD
+    // above), so a small fixed margin is enough — no need to separately hunt
+    // for a "true achievable max" the way the old unnormalized metric did.
+    state.chartCeiling = DMAX * 1.08;
 
     document.getElementById("submit-feedback").innerHTML = "";
 
@@ -169,10 +163,10 @@
   function renderPlayScreen() {
     const x0 = currentX0();
     const t = currentT();
-    const effective = applyPower(x0, t);
+    const effective = effectivePower(x0, t); // G_t(x0) — see effectivePower() above
     const total = sum(effective);
 
-    // effective attribute bars
+    // effective element power bars
     const maxVal = Math.max(...effective, 1) * 1.15;
     const barsWrap = document.getElementById("damage-bars");
     barsWrap.innerHTML = "";
@@ -265,16 +259,6 @@
       }
     }
 
-    const selfWrap = document.getElementById("self-effect-list");
-    selfWrap.innerHTML = "";
-    LABELS.forEach((label, i) => {
-      const pct = (B[i][i] - 1) * 100;
-      const item = document.createElement("div");
-      item.className = "synergy-item";
-      item.innerHTML = `<span class="dot" style="background:${COLORS[label]}"></span>${label} (self): ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% / round`;
-      selfWrap.appendChild(item);
-    });
-
     document.getElementById("total-points-value").textContent = TOTAL_POINTS;
   }
 
@@ -282,7 +266,7 @@
 
   function submitScore() {
     const t = currentT();
-    const effective = applyPower(currentX0(), t);
+    const effective = effectivePower(currentX0(), t);
     const record = {
       name: state.playerName,
       score: Number(sum(effective).toFixed(2)),
